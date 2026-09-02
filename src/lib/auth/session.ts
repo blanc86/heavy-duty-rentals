@@ -1,7 +1,7 @@
-import { and, eq, isNull, gt, sql as raw } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, sql as raw } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
-import { companyMembers, sessions, users } from "@/lib/db/schema/identity";
+import { companyMembers, mfaCredentials, sessions, users } from "@/lib/db/schema/identity";
 import { env, isProduction } from "@/lib/env";
 import { uuidv7 } from "@/lib/ids";
 import { generateToken, hashToken } from "./crypto";
@@ -22,6 +22,8 @@ export interface AuthenticatedActor {
   isPlatformAdmin: boolean;
   sessionId: string;
   mfaSatisfied: boolean;
+  /** True when a confirmed TOTP credential exists for this user. */
+  mfaEnrolled: boolean;
   /** Active company memberships. THE tenancy fact; never taken from a request. */
   memberships: { companyId: string; role: CompanyRole }[];
 }
@@ -82,17 +84,28 @@ export async function clearSessionCookie(): Promise<void> {
   store.delete(SESSION_COOKIE);
 }
 
+interface ResolvedSession {
+  row: {
+    sessionId: string;
+    mfaSatisfiedAt: Date | null;
+    expiresAt: Date;
+    userId: string;
+    email: string;
+    fullName: string;
+    preferredLocale: "en" | "ar";
+    isPlatformAdmin: boolean;
+  };
+  mfaEnrolled: boolean;
+}
+
 /**
- * Resolve the current actor from the session cookie.
+ * Load and validate the session behind the cookie.
  *
- * Everything about the actor — identity, admin flag, company memberships — is
- * read from the database on each request. Nothing is trusted from the cookie
- * beyond the opaque token itself, so a forged or edited cookie yields no
- * privileges.
- *
- * Returns null rather than throwing: many pages are legitimately anonymous.
+ * Shared by `getActor` and `getPendingMfaSession` so both agree on exactly what
+ * a valid session is. Duplicating this check is how the two views drift apart
+ * and one of them ends up accepting a revoked or expired session.
  */
-export async function getActor(): Promise<AuthenticatedActor | null> {
+async function resolveSession(): Promise<ResolvedSession | null> {
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
@@ -130,6 +143,41 @@ export async function getActor(): Promise<AuthenticatedActor | null> {
   // A suspended user's existing sessions must stop working immediately.
   if (row.status !== "active") return null;
 
+  // Enrolment is read fresh on every request rather than baked into the
+  // session, so enabling MFA takes effect immediately on existing sessions.
+  const [credential] = await db
+    .select({ id: mfaCredentials.id })
+    .from(mfaCredentials)
+    .where(and(eq(mfaCredentials.userId, row.userId), isNotNull(mfaCredentials.confirmedAt)))
+    .limit(1);
+
+  return { row, mfaEnrolled: credential !== undefined };
+}
+
+/**
+ * Resolve the current actor from the session cookie.
+ *
+ * Everything about the actor — identity, admin flag, company memberships — is
+ * read from the database on each request. Nothing is trusted from the cookie
+ * beyond the opaque token itself, so a forged or edited cookie yields no
+ * privileges.
+ *
+ * IMPORTANT: a session belonging to a user who HAS enrolled MFA but has not
+ * satisfied it returns null. The cookie exists, but it grants nothing anywhere
+ * in the application until the challenge is passed — a half-authenticated
+ * session that could still browse would defeat the second factor.
+ *
+ * Returns null rather than throwing: many pages are legitimately anonymous.
+ */
+export async function getActor(): Promise<AuthenticatedActor | null> {
+  const resolved = await resolveSession();
+  if (!resolved) return null;
+
+  const { row, mfaEnrolled } = resolved;
+
+  // Enrolled but unsatisfied: not an actor yet.
+  if (mfaEnrolled && row.mfaSatisfiedAt === null) return null;
+
   const memberships = await db
     .select({ companyId: companyMembers.companyId, role: companyMembers.role })
     .from(companyMembers)
@@ -137,6 +185,7 @@ export async function getActor(): Promise<AuthenticatedActor | null> {
 
   // Slide the expiry, but only when it is meaningfully stale, so an active
   // session does not write to the database on every single request.
+  const now = new Date();
   const halfLife = env.SESSION_TTL_SECONDS * 500;
   if (row.expiresAt.getTime() - now.getTime() < halfLife) {
     await db
@@ -153,8 +202,44 @@ export async function getActor(): Promise<AuthenticatedActor | null> {
     isPlatformAdmin: row.isPlatformAdmin,
     sessionId: row.sessionId,
     mfaSatisfied: row.mfaSatisfiedAt !== null,
+    mfaEnrolled,
     memberships,
   };
+}
+
+/**
+ * A session that exists but has NOT yet cleared the second factor.
+ *
+ * Returned only to the MFA challenge screen. `getActor` deliberately reports
+ * null for this state, so the cookie grants nothing anywhere else in the
+ * application until the challenge is passed.
+ */
+export interface PendingMfaSession {
+  sessionId: string;
+  userId: string;
+  email: string;
+  fullName: string;
+  preferredLocale: "en" | "ar";
+}
+
+export async function getPendingMfaSession(): Promise<PendingMfaSession | null> {
+  const resolved = await resolveSession();
+  if (!resolved) return null;
+  // Already satisfied, or MFA is not enrolled: there is no challenge to answer.
+  if (!resolved.mfaEnrolled || resolved.row.mfaSatisfiedAt !== null) return null;
+
+  return {
+    sessionId: resolved.row.sessionId,
+    userId: resolved.row.userId,
+    email: resolved.row.email,
+    fullName: resolved.row.fullName,
+    preferredLocale: resolved.row.preferredLocale,
+  };
+}
+
+/** Mark this session as having cleared the second factor. */
+export async function markSessionMfaSatisfied(sessionId: string): Promise<void> {
+  await db.update(sessions).set({ mfaSatisfiedAt: new Date() }).where(eq(sessions.id, sessionId));
 }
 
 export async function revokeSession(sessionId: string): Promise<void> {

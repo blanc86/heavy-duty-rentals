@@ -31,21 +31,24 @@ Everything below was exercised against a live PostgreSQL 17 instance and a runni
 | **Authorization** | Anonymous `/admin` access redirected; 38 RBAC/isolation assertions pass |
 | **SEO** | `robots.txt`, `sitemap.xml`, JSON-LD (Organization, Product, LocalBusiness, FAQ, Article, Breadcrumb), canonicals |
 | **Doorway-page guard** | `/locations/mecca` (no depot) returns **404** while `/locations/dammam` returns 200 |
-| **Production build** | 34 routes compile; `typecheck`, `lint` and 99 tests all clean |
+| **Two-factor authentication** | TOTP enrolment, confirmation, recovery codes, disable, regenerate. Enrolling MFA instantly strips power from an existing session — verified live |
+| **Equipment imagery** | Generated technical illustrations per category; real photographs take precedence automatically when supplied |
+| **Production build** | 37 routes compile; `typecheck`, `lint` and 117 tests all clean |
 
 ### Test results
 
 ```
-Test Files  4 passed (4)
-     Tests  99 passed (99)
+Test Files  5 passed (5)
+     Tests  117 passed (117)
 ```
 
 - `tests/unit/pricing-engine.test.ts` — 41 assertions
 - `tests/integration/availability.test.ts` — 14 assertions (concurrency, blackouts, holds, range validity)
 - `tests/integration/booking.test.ts` — 6 assertions (server-computed price, price-manipulation rejection + audit, idempotency, overlap rejection, pricing snapshot, occupancy buffers)
 - `tests/security/isolation.test.ts` — 38 assertions (tenancy, IDOR, escalation, separation of duties, DB constraints, driver error unwrapping)
+- `tests/integration/mfa.test.ts` — 18 assertions (secret encryption at rest, code replay rejection, drift tolerance, single-use recovery codes)
 
-Plus `scripts/verify-flow.mjs` — 33 live HTTP checks, all passing.
+Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) and `scripts/verify-mfa.mjs` (12 checks on the MFA gate).
 
 ### Feature inventory
 
@@ -87,7 +90,7 @@ Each of these needs something only the business can supply. In every case the in
 | 6 | **Malware scanning on uploads** | Needs a scanning service | Required before accepting customer document uploads in production |
 | 7 | **Breached-password check** | Outbound k-anonymity API the business must accept | `isBreachedPassword` is a documented stub returning `false` — deliberately not a fake pass |
 | 8 | **Redis rate limiting** | Single instance does not need it | **Required before running >1 instance**, otherwise limits multiply by instance count. Startup warns about this |
-| 9 | **TOTP MFA enrolment UI** | Time | Schema, encryption and replay protection exist; the enrolment flow does not. Admin actions require `mfaSatisfied` in production, so **admin mutations would currently fail in production** until this is built |
+| 9 | ~~TOTP MFA enrolment UI~~ | **DONE** | Full flow built: QR enrolment, code confirmation, single-use recovery codes, disable-with-password, regenerate. 18 unit tests + 12 live gate checks |
 | 10 | **Delivery dispatch, inspections, reviews, quotes admin, approval workflows, credit terms, CSV export, CMS admin** | T2 scope | Schema is complete for all of them; UI is not built |
 | 11 | **Playwright E2E suite** | Time | `playwright.config.ts` is configured; `scripts/verify-flow.mjs` covers the same ground at HTTP level |
 | 12 | **Recommendation wizard, telematics, marketplace, dynamic pricing** | T3 / YAGNI | Boundaries reserved (`supplierId`, `telematicsDeviceId`) |
@@ -98,7 +101,7 @@ Each of these needs something only the business can supply. In every case the in
 
 1. **The browser click-through has not been executed.** `createBooking` is now covered directly by integration tests (price computation, tampering rejection, idempotency, overlap handling, snapshot, buffers) — and writing those found two bugs that would have broken every booking. What remains unverified is the thin Server Action wrapper and the React form around it: form submission, the redirect to the payment page, and the return leg. Click it once in a browser before trusting it.
 2. **Invoices and agreements are print-optimised HTML, not generated PDFs.** Deliberate: Arabic shaping and bidi in a JS PDF library is a well-known source of broken output, and browsers do both correctly. A real PDF pipeline becomes necessary anyway for ZATCA's PDF/A-3 requirement.
-3. **No real equipment photography.** `/api/media/*` serves a neutral SVG placeholder. The schema, alt text (bilingual) and storage boundary are ready.
+3. **Imagery is generated, not photographed.** Each category renders a technical SVG silhouette (`lib/media/equipment-illustration.ts`), captioned "· illustration" in the page locale. This was a deliberate choice over stock photography: search-engine images are almost always copyrighted, the brief bans "generic stock imagery", and a photo of somebody else's crane on an equipment page implies it is ours. A `class_image` row takes precedence automatically, so commissioning real photography needs no code change — it is the single highest-impact visual improvement available.
 4. **`generateStaticParams` returns empty for category pages** — they render dynamically. Fine at this scale; worth revisiting for cache efficiency.
 5. **Rate limiting is in-memory.** Correct for one instance only (see gap #8).
 6. **Arabic copy is engineer-written, not professionally translated.** Coherent and using correct industry vocabulary, but it needs review before launch. Flagged in the file header.
@@ -116,7 +119,7 @@ Verified live, not merely asserted: CSP with per-request nonce · `frame-ancesto
 ### Remaining security work — in priority order
 
 1. **Independent penetration test.** Non-negotiable before production. Automated tests prove the invariants I thought of; they do not substitute for an adversary who thinks of others.
-2. **Build the MFA enrolment flow.** Admin mutations are gated on `mfaSatisfied` in production and would currently fail. This is a correctness blocker as well as a security one.
+2. ~~Build the MFA enrolment flow.~~ **Done** — see §1.
 3. **Provision a least-privilege database role.** Migration 0001 revokes `UPDATE`/`DELETE` on `audit_log` and `booking_event` *from a role named `hdr_app` if it exists*. Local development connects as the owner, so **that revocation is currently a no-op**. Production must create the role.
 4. **Wire monitoring.** Interfaces exist, no vendor connected. At minimum alert on: authentication failure spikes, authorization-denial patterns, `price_mismatch` events, webhook signature failures, and exclusion-violation rates above baseline.
 5. **Redis rate limiting** before scaling past one instance.
@@ -172,9 +175,9 @@ Verified live, not merely asserted: CSP with per-request nonce · `frame-ancesto
 
 **Before anything else (week 1)**
 1. Click through the booking form once in a browser — the service beneath it is tested, the form wrapper is not.
-2. Build the MFA enrolment flow (blocks admin mutations in production).
-3. Provision the least-privilege `hdr_app` database role.
-4. Replace demo company details, then replace demo inventory with the real fleet.
+2. Provision the least-privilege `hdr_app` database role.
+3. Replace demo company details, then replace demo inventory with the real fleet.
+4. Commission real equipment photography (see "Imagery" below).
 
 **Before launch**
 5. Contract a PSP; wire and sandbox-test the real adapter, including the deposit-hold question.

@@ -3,6 +3,7 @@ import { Badge, Card, DemoBadge } from "@/components/ui";
 import type { ClassSummary } from "@/lib/catalog/repository";
 import type { Dictionary } from "@/lib/i18n";
 import { formatNumber, localePath, type Locale } from "@/lib/i18n/config";
+import { illustrationUrl } from "@/lib/media/equipment-illustration";
 import { formatMoneyCompact } from "@/lib/money";
 
 /**
@@ -37,22 +38,23 @@ export function EquipmentCard({
     <Card className="group flex flex-col overflow-hidden transition-shadow hover:shadow-[--shadow-raised]">
       <Link href={href} className="block focus-visible:outline-none">
         <div className="relative aspect-[4/3] overflow-hidden bg-steel-100">
-          {item.primaryImageKey ? (
-            // eslint-disable-next-line @next/next/no-img-element -- storage-backed key, not a build-time asset
-            <img
-              src={`/api/media/${item.primaryImageKey}`}
-              alt={item.primaryImageAlt ?? item.name}
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="grid h-full place-items-center text-steel-300" aria-hidden="true">
-              <svg viewBox="0 0 24 24" className="h-12 w-12" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M3 20h18M6 20V9l6-5v16M12 9h7v11" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-          )}
+          {/*
+            A real photograph wins whenever the business has supplied one.
+            Otherwise a generated technical illustration for the category — see
+            lib/media/equipment-illustration.ts for why it is drawn, not stock.
+          */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- storage-backed key or generated SVG, not a build-time asset */}
+          <img
+            src={
+              item.primaryImageKey
+                ? `/api/media/${item.primaryImageKey}`
+                : illustrationUrl(item.categorySlug, locale)
+            }
+            alt={item.primaryImageAlt ?? item.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
 
           {item.isDemoData && (
             <div className="absolute start-2 top-2">
@@ -117,7 +119,10 @@ export function EquipmentCard({
           </Badge>
         </div>
 
-        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+        {/* flex-wrap so the CTA drops below the price rather than colliding
+            with it when the card is narrow — this row carries the two things
+            the buyer actually acts on. */}
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-x-3 gap-y-2 pt-4">
           {item.fromDailyRateHalalas !== null ? (
             <p>
               <span className="block text-2xs uppercase tracking-wide text-steel-500">
@@ -132,7 +137,7 @@ export function EquipmentCard({
             <p className="text-sm font-medium text-steel-600">{dict.equipment.requestQuote}</p>
           )}
 
-          <span className="relative z-10 inline-flex min-h-[2.25rem] items-center rounded-[--radius-control] bg-steel-900 px-3 text-sm font-semibold text-white transition-colors group-hover:bg-amber-500 group-hover:text-steel-950">
+          <span className="relative z-10 inline-flex min-h-[2.25rem] shrink-0 items-center whitespace-nowrap rounded-[--radius-control] bg-steel-900 px-3 text-sm font-semibold text-white transition-colors group-hover:bg-amber-500 group-hover:text-steel-950">
             {item.instantBookable ? dict.equipment.checkAvailability : dict.equipment.requestQuote}
           </span>
         </div>

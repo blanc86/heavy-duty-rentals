@@ -31,6 +31,7 @@ function actor(overrides: Partial<AuthenticatedActor> = {}): AuthenticatedActor 
     isPlatformAdmin: false,
     sessionId: "session-a",
     mfaSatisfied: false,
+    mfaEnrolled: false,
     memberships: [],
     ...overrides,
   };

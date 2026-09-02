@@ -74,9 +74,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           </h1>
           <p className="mt-1 text-sm text-steel-600">{actor.fullName}</p>
         </div>
-        <ButtonLink href={localePath(locale, "/equipment")} size="md">
-          {dict.account.browseEquipment}
-        </ButtonLink>
+        <div className="flex gap-2">
+          <ButtonLink href={localePath(locale, "/account/security")} variant="ghost" size="md">
+            {dict.account.security}
+          </ButtonLink>
+          <ButtonLink href={localePath(locale, "/equipment")} size="md">
+            {dict.account.browseEquipment}
+          </ButtonLink>
+        </div>
       </div>
 
       <ul className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">

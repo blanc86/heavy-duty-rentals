@@ -1,10 +1,10 @@
 "use server";
 
-import { eq, sql as raw } from "drizzle-orm";
+import { and, eq, isNotNull, sql as raw } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { companyMembers, companies, users } from "@/lib/db/schema/identity";
+import { companyMembers, companies, mfaCredentials, users } from "@/lib/db/schema/identity";
 import { uuidv7 } from "@/lib/ids";
 import { getDummyHash, hashPassword, verifyPassword } from "./crypto";
 import { checkPassword, passwordSchema } from "./password-policy";
@@ -243,21 +243,31 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
 
         await resetRateLimit("login", data.email);
 
+        // Does this account carry a confirmed second factor?
+        const [mfa] = await db
+          .select({ id: mfaCredentials.id })
+          .from(mfaCredentials)
+          .where(and(eq(mfaCredentials.userId, user.id), isNotNull(mfaCredentials.confirmedAt)))
+          .limit(1);
+        const requiresMfa = mfa !== undefined;
+
         // A fresh session id on every successful login: session-fixation
         // defence, since a token planted before login does not survive it.
+        //
+        // When MFA is enrolled the session is created UNSATISFIED. `getActor`
+        // returns null for that state, so the cookie grants nothing anywhere
+        // until the challenge is answered — the password alone never gets past
+        // the second factor.
         const session = await createSession({
           userId: user.id,
           ipAddress: ip,
           userAgent,
-          // MFA enrolment is not built for customers in V1. Admin actions
-          // require `mfaSatisfied` in production, so an admin account without
-          // a second factor cannot perform them there.
           mfaSatisfied: false,
         });
         await setSessionCookie(session.token, session.expiresAt);
 
         await writeAudit({
-          action: "auth.login",
+          action: requiresMfa ? "auth.login_password_stage" : "auth.login",
           actorUserId: user.id,
           actorType: user.isPlatformAdmin ? "admin" : "customer",
           actorIp: ip ?? null,
@@ -273,6 +283,13 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
           !data.redirectTo.startsWith("//")
             ? data.redirectTo
             : `/${data.locale}/account`;
+
+        if (requiresMfa) {
+          // Carry the intended destination through the challenge so the user
+          // still lands where they were going.
+          const next = encodeURIComponent(safeRedirect);
+          return { ok: true as const, redirectTo: `/${data.locale}/login/mfa?next=${next}` };
+        }
 
         return { ok: true as const, redirectTo: safeRedirect };
       },

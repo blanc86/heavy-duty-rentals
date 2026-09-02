@@ -20,6 +20,7 @@ import { db } from "@/lib/db";
 import { addonOptions } from "@/lib/db/schema/pricing";
 import { getDictionary } from "@/lib/i18n";
 import { formatNumber, isLocale, localePath, type Locale } from "@/lib/i18n/config";
+import { illustrationUrl } from "@/lib/media/equipment-illustration";
 import { formatMoneyCompact } from "@/lib/money";
 import { breadcrumbJsonLd, equipmentJsonLd } from "@/lib/seo/json-ld";
 import { and, eq, isNull, or } from "drizzle-orm";
@@ -221,23 +222,19 @@ export default async function EquipmentDetailPage({
             </div>
 
             <div className="mt-5 aspect-[16/10] overflow-hidden rounded-[--radius-card] border border-steel-200 bg-steel-100">
-              {item.images[0] ? (
-                // eslint-disable-next-line @next/next/no-img-element -- storage-backed key, not a build-time asset
-                <img
-                  src={`/api/media/${item.images[0].storageKey}`}
-                  alt={item.images[0].alt}
-                  className="h-full w-full object-cover"
-                  // Above the fold on mobile, so it is the LCP element and
-                  // must not be lazy-loaded.
-                  fetchPriority="high"
-                />
-              ) : (
-                <div className="grid h-full place-items-center text-steel-300">
-                  <svg viewBox="0 0 24 24" className="h-20 w-20" fill="none" stroke="currentColor" strokeWidth="1.2">
-                    <path d="M3 20h18M6 20V9l6-5v16M12 9h7v11" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-              )}
+              {/* eslint-disable-next-line @next/next/no-img-element -- storage-backed key or generated SVG, not a build-time asset */}
+              <img
+                src={
+                  item.images[0]
+                    ? `/api/media/${item.images[0].storageKey}`
+                    : illustrationUrl(item.categorySlug, locale)
+                }
+                alt={item.images[0]?.alt ?? item.name}
+                className="h-full w-full object-cover"
+                // Above the fold on mobile, so it is the LCP element and must
+                // not be lazy-loaded.
+                fetchPriority="high"
+              />
             </div>
 
             {item.description && (
