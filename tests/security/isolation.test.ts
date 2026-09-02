@@ -498,3 +498,107 @@ describe("driver error unwrapping", () => {
     expect(isExclusionViolation(null)).toBe(false);
   });
 });
+
+describe.runIf(await isDatabaseAvailable())("consent is enforced by the database", () => {
+  it("refuses to publish a testimonial without consent", async () => {
+    const sql = getSql();
+    let code = "";
+    try {
+      await sql`
+        INSERT INTO testimonial (id, quote_en, quote_ar, consent_obtained, is_published)
+        VALUES (${uuidv7()}, 'Great service', 'خدمة ممتازة', FALSE, TRUE)
+      `;
+    } catch (error) {
+      code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code: unknown }).code)
+          : "";
+    }
+    // Publishing a client's words without permission is a commercial and a
+    // PDPL problem. A checkbox in an admin form would not survive a bulk
+    // import written in a hurry; a CHECK constraint does.
+    expect(code).toBe("23514");
+  });
+
+  it("refuses to store a NAMED company on a testimonial without consent", async () => {
+    const sql = getSql();
+    let code = "";
+    try {
+      await sql`
+        INSERT INTO testimonial
+          (id, quote_en, quote_ar, company_name, consent_obtained, is_published)
+        VALUES (${uuidv7()}, 'Great', 'ممتاز', 'Some Real Company', FALSE, FALSE)
+      `;
+    } catch (error) {
+      code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code: unknown }).code)
+          : "";
+    }
+    expect(code).toBe("23514");
+  });
+
+  it("allows an unpublished, unconsented DRAFT with no named company", async () => {
+    const sql = getSql();
+    const id = uuidv7();
+    await sql`
+      INSERT INTO testimonial (id, quote_en, quote_ar, consent_obtained, is_published)
+      VALUES (${id}, 'Draft awaiting sign-off', 'مسودة بانتظار الموافقة', FALSE, FALSE)
+    `;
+    const rows = await sql<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count FROM testimonial WHERE id = ${id}
+    `;
+    expect(rows[0]?.count).toBe(1);
+    await sql`DELETE FROM testimonial WHERE id = ${id}`;
+  });
+
+  it("refuses to publish a project naming a client without consent", async () => {
+    const sql = getSql();
+    let code = "";
+    try {
+      await sql`
+        INSERT INTO project
+          (id, slug, title_en, title_ar, client_name, consent_obtained, is_published)
+        VALUES (${uuidv7()}, ${`t-${uuidv7().slice(0, 8)}`}, 'Job', 'عمل',
+                'Some Real Client', FALSE, TRUE)
+      `;
+    } catch (error) {
+      code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code: unknown }).code)
+          : "";
+    }
+    expect(code).toBe("23514");
+  });
+
+  it("refuses to publish an UNVERIFIED credential", async () => {
+    const sql = getSql();
+    let code = "";
+    try {
+      await sql`
+        INSERT INTO credential (id, name_en, name_ar, verified_at, is_published)
+        VALUES (${uuidv7()}, 'ISO 9001', 'آيزو 9001', NULL, TRUE)
+      `;
+    } catch (error) {
+      code =
+        typeof error === "object" && error !== null && "code" in error
+          ? String((error as { code: unknown }).code)
+          : "";
+    }
+    // A certification badge on a page read by procurement teams who actually
+    // check is worse than no badge if it does not stand up.
+    expect(code).toBe("23514");
+  });
+
+  it("seeded demo trust content is flagged as demo", async () => {
+    const sql = getSql();
+    const rows = await sql<{ testimonials: number; projects: number }[]>`
+      SELECT
+        (SELECT COUNT(*)::int FROM testimonial WHERE is_published AND NOT is_demo_data) AS testimonials,
+        (SELECT COUNT(*)::int FROM project     WHERE is_published AND NOT is_demo_data) AS projects
+    `;
+    // Nothing published should be claiming to be real yet.
+    expect(rows[0]?.testimonials).toBe(0);
+    expect(rows[0]?.projects).toBe(0);
+  });
+});

@@ -14,3 +14,4 @@ export * from "./schema/booking";
 export * from "./schema/finance";
 export * from "./schema/ops";
 export * from "./schema/platform";
+export * from "./schema/marketing";

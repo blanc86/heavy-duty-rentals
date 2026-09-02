@@ -40,6 +40,10 @@ export function SiteFooter({
     {
       title: dict.footer.company,
       links: [
+        {
+          href: "/for-contractors",
+          label: locale === "ar" ? "للمقاولين" : "For contractors",
+        },
         { href: "/about", label: dict.nav.about },
         { href: "/locations", label: dict.nav.locations },
         { href: "/safety", label: dict.nav.safety },

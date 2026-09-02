@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import {
   branches,
   classDocuments,
-  classImages,
   classSpecs,
   equipmentCategories,
   equipmentClasses,
@@ -405,7 +404,18 @@ export interface ClassDetail extends ClassSummary {
   metaTitle: string | null;
   metaDescription: string | null;
   specs: { group: string | null; label: string; value: string; unit: string | null }[];
-  images: { storageKey: string; alt: string; isPrimary: boolean }[];
+  images: {
+    storageKey: string;
+    alt: string;
+    isPrimary: boolean;
+    /** Present for free-licensed photography; CC BY/BY-SA require it shown. */
+    attribution: {
+      author: string | null;
+      licence: string | null;
+      licenceUrl: string | null;
+      sourceUrl: string | null;
+    } | null;
+  }[];
   documents: { id: string; kind: string; title: string; sizeBytes: number }[];
   availableBranches: { slug: string; name: string; city: string; unitCount: number }[];
 }
@@ -468,15 +478,26 @@ export async function getClassBySlug(slug: string, locale: Locale): Promise<Clas
       .where(eq(classSpecs.classId, row.id))
       .orderBy(asc(classSpecs.sortOrder)),
 
-    db
-      .select({
-        storageKey: classImages.storageKey,
-        alt: locale === "ar" ? classImages.altAr : classImages.altEn,
-        isPrimary: classImages.isPrimary,
-      })
-      .from(classImages)
-      .where(eq(classImages.classId, row.id))
-      .orderBy(asc(classImages.sortOrder)),
+    // Attribution is joined in rather than fetched separately, so an image can
+    // never render without the credit its licence requires.
+    db.execute<{
+      storage_key: string;
+      alt: string;
+      is_primary: boolean;
+      author: string | null;
+      licence: string | null;
+      licence_url: string | null;
+      source_url: string | null;
+    }>(raw`
+      SELECT ci.storage_key,
+             ci.${localized(locale, "alt_en", "alt_ar")} AS alt,
+             ci.is_primary,
+             ia.author, ia.licence, ia.licence_url, ia.source_url
+      FROM class_image ci
+      LEFT JOIN image_attribution ia ON ia.storage_key = ci.storage_key
+      WHERE ci.class_id = ${row.id}
+      ORDER BY ci.is_primary DESC, ci.sort_order ASC
+    `),
 
     // Only PUBLIC documents on a public page. Insurance and registration
     // certificates are `internal` and never reach an anonymous visitor.
@@ -520,7 +541,19 @@ export async function getClassBySlug(slug: string, locale: Locale): Promise<Clas
     metaTitle: row.meta_title,
     metaDescription: row.meta_description,
     specs: specs.map((s) => ({ group: s.group, label: s.label, value: s.value, unit: s.unit })),
-    images,
+    images: images.map((image) => ({
+      storageKey: image.storage_key,
+      alt: image.alt,
+      isPrimary: image.is_primary,
+      attribution: image.licence
+        ? {
+            author: image.author,
+            licence: image.licence,
+            licenceUrl: image.licence_url,
+            sourceUrl: image.source_url,
+          }
+        : null,
+    })),
     documents,
     availableBranches: branchRows.map((b) => ({
       slug: b.slug,

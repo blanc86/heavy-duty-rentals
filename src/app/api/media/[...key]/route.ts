@@ -1,46 +1,74 @@
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import path from "node:path";
 import { NextResponse } from "next/server";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
+import { Readable } from "node:stream";
 
 /**
  * Media delivery.
  *
- * Object keys are SERVER-GENERATED UUIDs with no user-controlled component, so
- * key enumeration and path traversal are both structurally impossible rather
- * than filtered against.
+ * Object keys are SERVER-GENERATED with no user-controlled component, so key
+ * enumeration and path traversal are structurally impossible rather than
+ * filtered against. The resolved path is nevertheless re-checked against the
+ * media root before anything is read — defence in depth costs nothing here.
  *
- * The seed ships no binary image files (a repository is the wrong place for
- * them), so this returns a neutral SVG placeholder. Wiring real storage means
- * implementing the StorageProvider boundary and returning a short-lived signed
- * URL — see docs/ARCHITECTURE.md §9.
+ * Demo photography lives under `public/demo-equipment/`. Production should
+ * serve from private object storage behind short-lived signed URLs instead;
+ * see docs/ARCHITECTURE.md §9.
  */
+const MEDIA_ROOT = path.resolve(process.cwd(), "public");
+
+const CONTENT_TYPES: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".avif": "image/avif",
+  ".svg": "image/svg+xml",
+};
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ key: string[] }> },
 ) {
   const { key } = await params;
 
-  // Defence in depth: even though keys are server-generated, reject anything
-  // that looks like traversal before it is used for anything.
-  if (key.some((segment) => segment.includes("..") || segment.includes("\\"))) {
+  // Reject anything traversal-shaped before it is used for anything at all.
+  if (key.some((segment) => segment.includes("..") || segment.includes("\\") || segment.startsWith("."))) {
     return new NextResponse(null, { status: 400 });
   }
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Equipment photograph placeholder">
-  <rect width="800" height="600" fill="#e8eaee"/>
-  <g fill="none" stroke="#a9b0bd" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M120 470h560M220 470V250l180-140v360M400 250h200v220"/>
-  </g>
-  <text x="400" y="540" text-anchor="middle" font-family="system-ui, sans-serif" font-size="26" fill="#6b7280">
-    Equipment photo placeholder
-  </text>
-</svg>`;
+  const requested = path.resolve(MEDIA_ROOT, ...key);
+  // The resolved path must still sit inside the media root. This catches any
+  // traversal the segment check above did not.
+  if (!requested.startsWith(MEDIA_ROOT + path.sep)) {
+    return new NextResponse(null, { status: 400 });
+  }
 
-  return new NextResponse(svg, {
-    headers: {
-      "Content-Type": "image/svg+xml",
-      "Cache-Control": "public, max-age=3600",
-      // A placeholder is inert, but the header costs nothing and prevents any
-      // future content-sniffing surprise.
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  const extension = path.extname(requested).toLowerCase();
+  const contentType = CONTENT_TYPES[extension];
+  // Only known image types are ever served, so an uploaded file cannot be
+  // returned with a type that a browser would execute.
+  if (!contentType) return new NextResponse(null, { status: 404 });
+
+  try {
+    const info = await stat(requested);
+    if (!info.isFile()) return new NextResponse(null, { status: 404 });
+
+    const stream = Readable.toWeb(createReadStream(requested)) as WebReadableStream<Uint8Array>;
+
+    return new NextResponse(stream as unknown as BodyInit, {
+      headers: {
+        "Content-Type": contentType,
+        "Content-Length": String(info.size),
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+        "X-Content-Type-Options": "nosniff",
+        // Never let a served media file run as script in our origin.
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+      },
+    });
+  } catch {
+    return new NextResponse(null, { status: 404 });
+  }
 }

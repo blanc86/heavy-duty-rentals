@@ -32,14 +32,16 @@ Everything below was exercised against a live PostgreSQL 17 instance and a runni
 | **SEO** | `robots.txt`, `sitemap.xml`, JSON-LD (Organization, Product, LocalBusiness, FAQ, Article, Breadcrumb), canonicals |
 | **Doorway-page guard** | `/locations/mecca` (no depot) returns **404** while `/locations/dammam` returns 200 |
 | **Two-factor authentication** | TOTP enrolment, confirmation, recovery codes, disable, regenerate. Enrolling MFA instantly strips power from an existing session — verified live |
-| **Equipment imagery** | Generated technical illustrations per category; real photographs take precedence automatically when supplied |
+| **Equipment imagery** | 17 real photographs under CC BY / CC BY-SA / public domain, with author and licence recorded and rendered; generated illustrations fill the gaps |
+| **Trust content** | Testimonials, reference projects and credentials — consent and verification enforced by database CHECK constraints, not by an admin checkbox |
+| **Persuasion landing page** | `/for-contractors` — narrative-led for cold traffic, distinct in structure from the transactional homepage |
 | **Production build** | 37 routes compile; `typecheck`, `lint` and 117 tests all clean |
 
 ### Test results
 
 ```
 Test Files  5 passed (5)
-     Tests  117 passed (117)
+     Tests  123 passed (123)
 ```
 
 - `tests/unit/pricing-engine.test.ts` — 41 assertions
@@ -47,6 +49,8 @@ Test Files  5 passed (5)
 - `tests/integration/booking.test.ts` — 6 assertions (server-computed price, price-manipulation rejection + audit, idempotency, overlap rejection, pricing snapshot, occupancy buffers)
 - `tests/security/isolation.test.ts` — 38 assertions (tenancy, IDOR, escalation, separation of duties, DB constraints, driver error unwrapping)
 - `tests/integration/mfa.test.ts` — 18 assertions (secret encryption at rest, code replay rejection, drift tolerance, single-use recovery codes)
+
+The security suite additionally asserts that the database refuses to publish a testimonial or a named-client project without recorded consent, and refuses to publish an unverified credential.
 
 Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) and `scripts/verify-mfa.mjs` (12 checks on the MFA gate).
 
@@ -101,12 +105,16 @@ Each of these needs something only the business can supply. In every case the in
 
 1. **The browser click-through has not been executed.** `createBooking` is now covered directly by integration tests (price computation, tampering rejection, idempotency, overlap handling, snapshot, buffers) — and writing those found two bugs that would have broken every booking. What remains unverified is the thin Server Action wrapper and the React form around it: form submission, the redirect to the payment page, and the return leg. Click it once in a browser before trusting it.
 2. **Invoices and agreements are print-optimised HTML, not generated PDFs.** Deliberate: Arabic shaping and bidi in a JS PDF library is a well-known source of broken output, and browsers do both correctly. A real PDF pipeline becomes necessary anyway for ZATCA's PDF/A-3 requirement.
-3. **Imagery is generated, not photographed.** Each category renders a technical SVG silhouette (`lib/media/equipment-illustration.ts`), captioned "· illustration" in the page locale. This was a deliberate choice over stock photography: search-engine images are almost always copyrighted, the brief bans "generic stock imagery", and a photo of somebody else's crane on an equipment page implies it is ours. A `class_image` row takes precedence automatically, so commissioning real photography needs no code change — it is the single highest-impact visual improvement available.
-4. **`generateStaticParams` returns empty for category pages** — they render dynamically. Fine at this scale; worth revisiting for cache efficiency.
-5. **Rate limiting is in-memory.** Correct for one instance only (see gap #8).
-6. **Arabic copy is engineer-written, not professionally translated.** Coherent and using correct industry vocabulary, but it needs review before launch. Flagged in the file header.
-7. **Search is PostgreSQL full-text.** Correct at fleet scale (hundreds of units). Arabic uses the `simple` configuration because Postgres ships no Arabic stemmer; trigram indexes cover partial and misspelled input.
-8. **`clientIpFrom` trusts `X-Forwarded-For`.** Only meaningful behind a proxy that overwrites it. Used for audit context, never for a security decision — but the deployment must terminate at such a proxy.
+3. **Imagery is licensed demo photography, not the real fleet.** 17 of 18 classes carry a real photograph from Wikimedia Commons under CC BY, CC BY-SA or public domain, with the author, licence and source stored in `image_attribution` and rendered beneath the image — those licences require attribution, and storing it in the database rather than a template means the obligation survives a redesign. The remaining class and every category card falls back to a generated technical illustration.
+
+    **These are other companies' machines**, and some carry visible competitor branding. The caption says "Illustrative photo of a comparable machine, not this unit." Replacing them with the business's own photography needs no code change, removes the attribution requirement, and is still the single highest-impact visual improvement available.
+
+4. **Trust content is demo placeholder.** Testimonials, reference projects and the operational stat bar are populated with clearly-flagged demo rows (`is_demo_data`, badged in the UI). The stat bar counts real database facts — fleet size, model count, depot count — rather than unverifiable claims like "years in business". Credentials are seeded **unpublished and unverified on purpose**: the database refuses to publish one without `verified_at`, because a certification badge that does not stand up costs more than no badge on a page read by procurement teams who check.
+5. **`generateStaticParams` returns empty for category pages** — they render dynamically. Fine at this scale; worth revisiting for cache efficiency.
+6. **Rate limiting is in-memory.** Correct for one instance only (see gap #8).
+7. **Arabic copy is engineer-written, not professionally translated.** Coherent and using correct industry vocabulary, but it needs review before launch. Flagged in the file header.
+8. **Search is PostgreSQL full-text.** Correct at fleet scale (hundreds of units). Arabic uses the `simple` configuration because Postgres ships no Arabic stemmer; trigram indexes cover partial and misspelled input.
+9. **`clientIpFrom` trusts `X-Forwarded-For`.** Only meaningful behind a proxy that overwrites it. Used for audit context, never for a security decision — but the deployment must terminate at such a proxy.
 
 ---
 
@@ -177,7 +185,8 @@ Verified live, not merely asserted: CSP with per-request nonce · `frame-ancesto
 1. Click through the booking form once in a browser — the service beneath it is tested, the form wrapper is not.
 2. Provision the least-privilege `hdr_app` database role.
 3. Replace demo company details, then replace demo inventory with the real fleet.
-4. Commission real equipment photography (see "Imagery" below).
+4. Replace the demo testimonials and reference projects with real, consented ones — and record the consent, because the database will not publish them otherwise.
+5. Commission real equipment photography (see "Imagery" above).
 
 **Before launch**
 5. Contract a PSP; wire and sandbox-test the real adapter, including the deposit-hold question.

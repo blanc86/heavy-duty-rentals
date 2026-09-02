@@ -221,7 +221,8 @@ export default async function EquipmentDetailPage({
               </Badge>
             </div>
 
-            <div className="mt-5 aspect-[16/10] overflow-hidden rounded-[--radius-card] border border-steel-200 bg-steel-100">
+            <figure className="mt-5">
+            <div className="aspect-[16/10] overflow-hidden rounded-[--radius-card] border border-steel-200 bg-steel-100">
               {/* eslint-disable-next-line @next/next/no-img-element -- storage-backed key or generated SVG, not a build-time asset */}
               <img
                 src={
@@ -236,6 +237,50 @@ export default async function EquipmentDetailPage({
                 fetchPriority="high"
               />
             </div>
+
+            {/*
+              CC BY and CC BY-SA REQUIRE attribution. Rendering it from the
+              database rather than a hardcoded credit line means the obligation
+              survives a redesign. The business's own photography carries no
+              attribution row and this renders nothing.
+            */}
+            {item.images[0]?.attribution && (
+              <figcaption className="mt-2 text-xs text-steel-500">
+                {locale === "ar" ? "الصورة:" : "Photo:"}{" "}
+                {item.images[0].attribution.sourceUrl ? (
+                  <a
+                    href={item.images[0].attribution.sourceUrl}
+                    rel="noopener nofollow"
+                    target="_blank"
+                    className="underline underline-offset-2"
+                  >
+                    {item.images[0].attribution.author ?? "Wikimedia Commons"}
+                  </a>
+                ) : (
+                  (item.images[0].attribution.author ?? "Wikimedia Commons")
+                )}
+                {" · "}
+                {item.images[0].attribution.licenceUrl ? (
+                  <a
+                    href={item.images[0].attribution.licenceUrl}
+                    rel="noopener nofollow license"
+                    target="_blank"
+                    className="underline underline-offset-2"
+                  >
+                    {item.images[0].attribution.licence}
+                  </a>
+                ) : (
+                  item.images[0].attribution.licence
+                )}
+                {" · "}
+                <span>
+                  {locale === "ar"
+                    ? "صورة توضيحية لمعدة مماثلة، وليست لهذه الوحدة."
+                    : "Illustrative photo of a comparable machine, not this unit."}
+                </span>
+              </figcaption>
+            )}
+            </figure>
 
             {item.description && (
               <p className="mt-5 text-base leading-relaxed text-steel-700">{item.description}</p>

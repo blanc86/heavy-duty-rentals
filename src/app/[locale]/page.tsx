@@ -3,10 +3,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EquipmentCard } from "@/components/equipment/equipment-card";
 import { HeroSearch } from "@/components/search/hero-search";
+import {
+  CredentialsSection,
+  OperationalProofBar,
+  ProjectsSection,
+  TestimonialsSection,
+  WhyUsSection,
+} from "@/components/marketing/trust-sections";
 import { ButtonLink, Card, CardBody, Container, SectionHeading } from "@/components/ui";
 import { listBranches, listCategories, searchClasses } from "@/lib/catalog/repository";
 import { getDictionary } from "@/lib/i18n";
 import { formatNumber, isLocale, localePath, type Locale } from "@/lib/i18n/config";
+import {
+  getOperationalProof,
+  listPublishedCredentials,
+  listPublishedProjects,
+  listPublishedTestimonials,
+} from "@/lib/marketing/repository";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/json-ld";
 import { getBusinessSettings } from "@/lib/settings";
 
@@ -32,12 +45,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const locale: Locale = rawLocale;
   const dict = getDictionary(locale);
 
-  const [categories, branches, popular, business] = await Promise.all([
-    listCategories(locale),
-    listBranches(locale),
-    searchClasses({ locale, perPage: 6, sort: "capacity" }),
-    getBusinessSettings(),
-  ]);
+  const [categories, branches, popular, business, proof, testimonials, projects, credentials] =
+    await Promise.all([
+      listCategories(locale),
+      listBranches(locale),
+      searchClasses({ locale, perPage: 6, sort: "capacity" }),
+      getBusinessSettings(),
+      getOperationalProof(),
+      listPublishedTestimonials(locale, 3),
+      listPublishedProjects(locale, 3),
+      listPublishedCredentials(locale),
+    ]);
 
   return (
     <>
@@ -90,6 +108,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </ul>
         </Container>
       </section>
+
+      <OperationalProofBar proof={proof} locale={locale} />
 
       {/* --------------------------------------------------------------- */}
       <Container className="py-10 sm:py-14">
@@ -163,6 +183,14 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </ol>
         </Container>
       </section>
+
+      <WhyUsSection locale={locale} dict={dict} />
+
+      <TestimonialsSection testimonials={testimonials} locale={locale} dict={dict} />
+
+      <ProjectsSection projects={projects} locale={locale} dict={dict} />
+
+      <CredentialsSection credentials={credentials} locale={locale} />
 
       {/* --------------------------------------------------------------- */}
       <Container className="py-10 sm:py-14">

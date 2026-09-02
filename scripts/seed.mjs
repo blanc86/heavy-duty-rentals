@@ -791,6 +791,7 @@ async function main() {
       credit_transaction, maintenance_record, unit_blackout, equipment_unit,
       rate_tier, rate_card, addon_option, transport_rate, coupon, tax_rate,
       class_spec, class_image, class_document, equipment_class, equipment_category,
+      testimonial, project, credential,
       branch, project_site, company_member, company, mfa_credential, auth_token,
       session, notification, analytics_event, article, faq, setting, audit_log,
       booking, "user"
@@ -1064,6 +1065,186 @@ async function main() {
         VALUES (${uuidv7()}, ${article.slugAr}, 'ar', ${groupId}, ${article.titleAr},
                 ${article.excerptAr}, ${article.bodyAr}, ${article.titleAr},
                 ${article.excerptAr}, 'published', now() - interval '14 days', ${adminId})`;
+    }
+
+    // --- testimonials, projects, credentials -------------------------------
+    //
+    // DEMO PLACEHOLDERS. The database refuses to publish a testimonial or a
+    // named-client project without `consent_obtained` (see migration 0002), so
+    // the flag is set here alongside a note saying exactly what these are.
+    // Every row is `is_demo_data = true`, which makes the UI badge it.
+    //
+    // Publishing a real client's words or name without written permission is a
+    // commercial problem and a PDPL problem. Replace these with real,
+    // consented references before launch.
+    const DEMO_CONSENT =
+      "DEMO PLACEHOLDER - not a real client reference. No consent obtained. Replace before launch.";
+
+    const TESTIMONIALS = [
+      {
+        quoteEn:
+          "We used to lose half a day getting a straight answer on whether a 100-tonne machine was free. Now the dates are on the screen and the price includes mobilisation, so I can put a number in the variation order before I leave the site.",
+        quoteAr:
+          "\u0643\u0646\u0627 \u0646\u0636\u064a\u0651\u0639 \u0646\u0635\u0641 \u064a\u0648\u0645 \u0644\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0625\u062c\u0627\u0628\u0629 \u0648\u0627\u0636\u062d\u0629 \u0639\u0646 \u062a\u0648\u0641\u0631 \u0631\u0627\u0641\u0639\u0629 100 \u0637\u0646. \u0627\u0644\u0622\u0646 \u0627\u0644\u062a\u0648\u0627\u0631\u064a\u062e \u0638\u0627\u0647\u0631\u0629 \u0623\u0645\u0627\u0645\u064a \u0648\u0627\u0644\u0633\u0639\u0631 \u064a\u0634\u0645\u0644 \u0627\u0644\u062a\u0639\u0628\u0626\u0629 \u0648\u0627\u0644\u0646\u0642\u0644\u060c \u0641\u0623\u0633\u062a\u0637\u064a\u0639 \u0625\u062f\u0631\u0627\u062c \u0627\u0644\u0631\u0642\u0645 \u0641\u064a \u0623\u0645\u0631 \u0627\u0644\u062a\u063a\u064a\u064a\u0631 \u0642\u0628\u0644 \u0645\u063a\u0627\u062f\u0631\u0629 \u0627\u0644\u0645\u0648\u0642\u0639.",
+        authorName: "Demo Reference A",
+        roleEn: "Project Engineer",
+        roleAr: "\u0645\u0647\u0646\u062f\u0633 \u0645\u0634\u0631\u0648\u0639",
+        company: "Demo Contracting Co.",
+        contextEn: "Mid-rise residential \u00b7 Riyadh",
+        contextAr: "\u0645\u0634\u0631\u0648\u0639 \u0633\u0643\u0646\u064a \u00b7 \u0627\u0644\u0631\u064a\u0627\u0636",
+      },
+      {
+        quoteEn:
+          "The part that mattered to procurement was the paperwork. A PO number, a cost centre and a VAT invoice on the same day the machine was booked, instead of chasing an email thread for a week.",
+        quoteAr:
+          "\u0645\u0627 \u0643\u0627\u0646 \u0645\u0647\u0645\u0627\u064b \u0644\u0625\u062f\u0627\u0631\u0629 \u0627\u0644\u0645\u0634\u062a\u0631\u064a\u0627\u062a \u0647\u0648 \u0627\u0644\u0645\u0633\u062a\u0646\u062f\u0627\u062a. \u0631\u0642\u0645 \u0623\u0645\u0631 \u0634\u0631\u0627\u0621 \u0648\u0645\u0631\u0643\u0632 \u062a\u0643\u0644\u0641\u0629 \u0648\u0641\u0627\u062a\u0648\u0631\u0629 \u0636\u0631\u064a\u0628\u064a\u0629 \u0641\u064a \u0627\u0644\u064a\u0648\u0645 \u0646\u0641\u0633\u0647 \u0627\u0644\u0630\u064a \u062d\u064f\u062c\u0632\u062a \u0641\u064a\u0647 \u0627\u0644\u0645\u0639\u062f\u0629.",
+        authorName: "Demo Reference B",
+        roleEn: "Procurement Manager",
+        roleAr: "\u0645\u062f\u064a\u0631 \u0645\u0634\u062a\u0631\u064a\u0627\u062a",
+        company: "Demo Industrial Services",
+        contextEn: "Petrochemical maintenance \u00b7 Jubail",
+        contextAr: "\u0635\u064a\u0627\u0646\u0629 \u0628\u062a\u0631\u0648\u0643\u064a\u0645\u0627\u0648\u064a\u0629 \u00b7 \u0627\u0644\u062c\u0628\u064a\u0644",
+      },
+      {
+        quoteEn:
+          "Being told upfront that the rental was dry, and exactly what the low-bed would cost, meant no argument at the end of the month. That is rarer than it should be in this business.",
+        quoteAr:
+          "\u0645\u0639\u0631\u0641\u0629 \u0623\u0646 \u0627\u0644\u0625\u064a\u062c\u0627\u0631 \u063a\u064a\u0631 \u0634\u0627\u0645\u0644 \u0644\u0644\u0648\u0642\u0648\u062f \u0648\u062a\u0643\u0644\u0641\u0629 \u0627\u0644\u0645\u0642\u0637\u0648\u0631\u0629 \u0627\u0644\u0645\u0646\u062e\u0641\u0636\u0629 \u0645\u0633\u0628\u0642\u0627\u064b \u064a\u0639\u0646\u064a \u0639\u062f\u0645 \u0648\u062c\u0648\u062f \u062e\u0644\u0627\u0641 \u0641\u064a \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0631.",
+        authorName: "Demo Reference C",
+        roleEn: "Site Manager",
+        roleAr: "\u0645\u062f\u064a\u0631 \u0645\u0648\u0642\u0639",
+        company: null,
+        contextEn: "Infrastructure \u00b7 Eastern Province",
+        contextAr: "\u0628\u0646\u064a\u0629 \u062a\u062d\u062a\u064a\u0629 \u00b7 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u0634\u0631\u0642\u064a\u0629",
+      },
+    ];
+
+    for (const [index, t] of TESTIMONIALS.entries()) {
+      await tx`INSERT INTO testimonial
+        (id, quote_en, quote_ar, author_name, author_role_en, author_role_ar,
+         company_name, context_en, context_ar, consent_obtained, consent_note,
+         sort_order, is_published, is_demo_data, created_by_user_id)
+        VALUES (${uuidv7()}, ${t.quoteEn}, ${t.quoteAr}, ${t.authorName},
+                ${t.roleEn}, ${t.roleAr}, ${t.company}, ${t.contextEn}, ${t.contextAr},
+                TRUE, ${DEMO_CONSENT}, ${index}, TRUE, TRUE, ${adminId})`;
+    }
+
+    const PROJECTS = [
+      {
+        slug: "demo-tower-steel-erection",
+        titleEn: "Structural steel erection, 18-storey tower",
+        titleAr: "\u062a\u0631\u0643\u064a\u0628 \u0627\u0644\u0647\u064a\u0627\u0643\u0644 \u0627\u0644\u0645\u0639\u062f\u0646\u064a\u0629 \u0644\u0628\u0631\u062c \u0645\u0646 18 \u0637\u0627\u0628\u0642\u0627\u064b",
+        summaryEn:
+          "Six weeks of steel erection on a constrained city-centre plot. A 200 tonne all-terrain crane worked from a single set-up position because the site had no room to reposition, so radius rather than capacity drove the selection.",
+        summaryAr:
+          "\u0633\u062a\u0629 \u0623\u0633\u0627\u0628\u064a\u0639 \u0645\u0646 \u0623\u0639\u0645\u0627\u0644 \u062a\u0631\u0643\u064a\u0628 \u0627\u0644\u0647\u064a\u0627\u0643\u0644 \u0627\u0644\u0645\u0639\u062f\u0646\u064a\u0629 \u0641\u064a \u0645\u0648\u0642\u0639 \u0645\u062d\u062f\u0648\u062f \u0648\u0633\u0637 \u0627\u0644\u0645\u062f\u064a\u0646\u0629. \u0639\u0645\u0644\u062a \u0631\u0627\u0641\u0639\u0629 \u0628\u062d\u0645\u0648\u0644\u0629 200 \u0637\u0646 \u0645\u0646 \u0645\u0648\u0642\u0639 \u062a\u062c\u0647\u064a\u0632 \u0648\u0627\u062d\u062f\u060c \u0644\u0630\u0627 \u0643\u0627\u0646 \u0646\u0635\u0641 \u0627\u0644\u0642\u0637\u0631 \u0644\u0627 \u0627\u0644\u062d\u0645\u0648\u0644\u0629 \u0647\u0648 \u0627\u0644\u0645\u062d\u062f\u062f \u0644\u0644\u0627\u062e\u062a\u064a\u0627\u0631.",
+        client: "Demo Contracting Co.",
+        sectorEn: "Commercial construction",
+        sectorAr: "\u0625\u0646\u0634\u0627\u0621\u0627\u062a \u062a\u062c\u0627\u0631\u064a\u0629",
+        city: "Riyadh",
+        cityAr: "\u0627\u0644\u0631\u064a\u0627\u0636",
+        year: 2025,
+        durationDays: 42,
+        equipment: ["all-terrain-crane-200t", "telehandler-17m"],
+        metrics: [
+          { labelEn: "Heaviest lift", labelAr: "\u0623\u062b\u0642\u0644 \u0639\u0645\u0644\u064a\u0629 \u0631\u0641\u0639", value: "38 t" },
+          { labelEn: "Working radius", labelAr: "\u0646\u0635\u0641 \u0642\u0637\u0631 \u0627\u0644\u0639\u0645\u0644", value: "26 m" },
+          { labelEn: "Duration", labelAr: "\u0627\u0644\u0645\u062f\u0629", value: "42 days" },
+        ],
+      },
+      {
+        slug: "demo-refinery-shutdown",
+        titleEn: "Refinery shutdown support",
+        titleAr: "\u062f\u0639\u0645 \u0625\u064a\u0642\u0627\u0641 \u0645\u0635\u0641\u0627\u0629 \u0644\u0644\u0635\u064a\u0627\u0646\u0629",
+        summaryEn:
+          "Vessel removal and replacement during a planned turnaround. Machines were staged to a fixed hourly window because a shutdown has no tolerance for a late arrival, so mobilisation was scheduled around the permit rather than the other way round.",
+        summaryAr:
+          "\u0625\u0632\u0627\u0644\u0629 \u0648\u0627\u0633\u062a\u0628\u062f\u0627\u0644 \u0623\u0648\u0639\u064a\u0629 \u0623\u062b\u0646\u0627\u0621 \u0625\u064a\u0642\u0627\u0641 \u0645\u062e\u0637\u0637 \u0644\u0644\u0635\u064a\u0627\u0646\u0629. \u062c\u064f\u0647\u0632\u062a \u0627\u0644\u0645\u0639\u062f\u0627\u062a \u0648\u0641\u0642 \u0646\u0627\u0641\u0630\u0629 \u0632\u0645\u0646\u064a\u0629 \u0645\u062d\u062f\u062f\u0629 \u0644\u0623\u0646 \u0623\u0639\u0645\u0627\u0644 \u0627\u0644\u0625\u064a\u0642\u0627\u0641 \u0644\u0627 \u062a\u062d\u062a\u0645\u0644 \u0623\u064a \u062a\u0623\u062e\u064a\u0631.",
+        client: null,
+        sectorEn: "Petrochemical",
+        sectorAr: "\u0628\u062a\u0631\u0648\u0643\u064a\u0645\u0627\u0648\u064a\u0627\u062a",
+        city: "Jubail",
+        cityAr: "\u0627\u0644\u062c\u0628\u064a\u0644",
+        year: 2025,
+        durationDays: 14,
+        equipment: ["all-terrain-crane-100t", "boom-truck-15t", "low-bed-trailer-60t"],
+        metrics: [
+          { labelEn: "Machines deployed", labelAr: "\u0627\u0644\u0645\u0639\u062f\u0627\u062a \u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u0629", value: "5" },
+          { labelEn: "Shutdown window", labelAr: "\u0646\u0627\u0641\u0630\u0629 \u0627\u0644\u0625\u064a\u0642\u0627\u0641", value: "14 days" },
+          { labelEn: "Late arrivals", labelAr: "\u062d\u0627\u0644\u0627\u062a \u0627\u0644\u062a\u0623\u062e\u064a\u0631", value: "0" },
+        ],
+      },
+      {
+        slug: "demo-warehouse-earthworks",
+        titleEn: "Bulk earthworks, distribution warehouse",
+        titleAr: "\u0623\u0639\u0645\u0627\u0644 \u062d\u0641\u0631 \u0643\u0628\u064a\u0631\u0629 \u0644\u0645\u0633\u062a\u0648\u062f\u0639 \u062a\u0648\u0632\u064a\u0639",
+        summaryEn:
+          "Site clearance and bulk excavation on a greenfield logistics plot, running two excavators and a wheel loader against a fixed handover date.",
+        summaryAr:
+          "\u062a\u062c\u0647\u064a\u0632 \u0627\u0644\u0645\u0648\u0642\u0639 \u0648\u0623\u0639\u0645\u0627\u0644 \u0627\u0644\u062d\u0641\u0631 \u0627\u0644\u0643\u0628\u064a\u0631\u0629 \u0641\u064a \u0623\u0631\u0636 \u0644\u0648\u062c\u0633\u062a\u064a\u0629 \u062c\u062f\u064a\u062f\u0629\u060c \u0628\u062a\u0634\u063a\u064a\u0644 \u062d\u0641\u0627\u0631\u064a\u0646 \u0648\u0644\u0648\u062f\u0631 \u0628\u0639\u062c\u0644.",
+        client: "Demo Logistics Group",
+        sectorEn: "Logistics and warehousing",
+        sectorAr: "\u0627\u0644\u062e\u062f\u0645\u0627\u062a \u0627\u0644\u0644\u0648\u062c\u0633\u062a\u064a\u0629 \u0648\u0627\u0644\u062a\u062e\u0632\u064a\u0646",
+        city: "Jeddah",
+        cityAr: "\u062c\u062f\u0629",
+        year: 2024,
+        durationDays: 60,
+        equipment: ["excavator-36t", "excavator-20t", "wheel-loader-3m3"],
+        metrics: [
+          { labelEn: "Material moved", labelAr: "\u0643\u0645\u064a\u0629 \u0627\u0644\u0645\u0648\u0627\u062f \u0627\u0644\u0645\u0646\u0642\u0648\u0644\u0629", value: "48,000 m3" },
+          { labelEn: "Machines", labelAr: "\u0639\u062f\u062f \u0627\u0644\u0645\u0639\u062f\u0627\u062a", value: "3" },
+          { labelEn: "Duration", labelAr: "\u0627\u0644\u0645\u062f\u0629", value: "60 days" },
+        ],
+      },
+    ];
+
+    for (const [index, project] of PROJECTS.entries()) {
+      await tx`INSERT INTO project
+        (id, slug, title_en, title_ar, summary_en, summary_ar, client_name,
+         sector_en, sector_ar, city, city_ar, year, duration_days,
+         equipment_used, metrics, consent_obtained, consent_note,
+         sort_order, is_published, is_demo_data)
+        VALUES (${uuidv7()}, ${project.slug}, ${project.titleEn}, ${project.titleAr},
+                ${project.summaryEn}, ${project.summaryAr}, ${project.client},
+                ${project.sectorEn}, ${project.sectorAr}, ${project.city}, ${project.cityAr},
+                ${project.year}, ${project.durationDays},
+                ${JSON.stringify(project.equipment)}::jsonb,
+                ${JSON.stringify(project.metrics)}::jsonb,
+                TRUE, ${DEMO_CONSENT}, ${index}, TRUE, TRUE)`;
+    }
+
+    // Credentials are seeded UNVERIFIED and UNPUBLISHED on purpose. The
+    // database refuses to publish one without `verified_at`, and inventing a
+    // certification for a site aimed at procurement teams who actually check
+    // would be the worst possible false trust signal. The admin fills these in
+    // once the real certificates exist.
+    const CREDENTIALS = [
+      {
+        nameEn: "Third-party lifting equipment inspection",
+        nameAr: "\u0641\u062d\u0635 \u0645\u0639\u062f\u0627\u062a \u0627\u0644\u0631\u0641\u0639 \u0645\u0646 \u0637\u0631\u0641 \u062b\u0627\u0644\u062b",
+        issuerEn: "Accredited inspection body",
+        issuerAr: "\u062c\u0647\u0629 \u0641\u062d\u0635 \u0645\u0639\u062a\u0645\u062f\u0629",
+      },
+      {
+        nameEn: "ISO 9001 Quality Management",
+        nameAr: "\u0622\u064a\u0632\u0648 9001 \u0644\u0625\u062f\u0627\u0631\u0629 \u0627\u0644\u062c\u0648\u062f\u0629",
+        issuerEn: "Certification body",
+        issuerAr: "\u062c\u0647\u0629 \u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0627\u062a",
+      },
+      {
+        nameEn: "ISO 45001 Occupational Health and Safety",
+        nameAr: "\u0622\u064a\u0632\u0648 45001 \u0644\u0644\u0635\u062d\u0629 \u0648\u0627\u0644\u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u0645\u0647\u0646\u064a\u0629",
+        issuerEn: "Certification body",
+        issuerAr: "\u062c\u0647\u0629 \u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0627\u062a",
+      },
+    ];
+
+    for (const [index, c] of CREDENTIALS.entries()) {
+      await tx`INSERT INTO credential
+        (id, name_en, name_ar, issuer_en, issuer_ar, verified_at, sort_order,
+         is_published, is_demo_data)
+        VALUES (${uuidv7()}, ${c.nameEn}, ${c.nameAr}, ${c.issuerEn}, ${c.issuerAr},
+                NULL, ${index}, FALSE, TRUE)`;
     }
 
     // --- a maintenance blackout, so the availability engine has something
