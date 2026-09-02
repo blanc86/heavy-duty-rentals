@@ -1,0 +1,341 @@
+import { eq, sql as raw } from "drizzle-orm";
+import { db, isUniqueViolation } from "@/lib/db";
+import { bookings } from "@/lib/db/schema/booking";
+import { payments, paymentWebhookEvents } from "@/lib/db/schema/finance";
+import { uuidv7 } from "@/lib/ids";
+import type { Halalas } from "@/lib/money";
+import { transitionBooking } from "@/lib/booking/service";
+import { writeAudit } from "@/lib/server/audit";
+import { getPaymentProvider } from "./index";
+import type { PaymentIntent, VerifiedWebhookEvent } from "./types";
+
+/**
+ * Start payment for a booking.
+ *
+ * Two SEPARATE intents are created when a deposit applies:
+ *   - `rental_charge`          — money that is actually taken
+ *   - `deposit_authorization`  — a hold, released or partly captured on return
+ *
+ * Never one combined charge. A refundable deposit is not revenue, is outside
+ * the VAT base, and must be visibly distinct to the customer. Merging them is
+ * both a tax error and the single thing most likely to make a customer
+ * distrust the checkout.
+ */
+export async function startPayment(params: {
+  bookingId: string;
+  customer: { email: string; name: string; phone?: string | undefined };
+  returnUrl: string;
+  locale: "en" | "ar";
+}): Promise<{ rental: PaymentIntent; paymentId: string }> {
+  const provider = getPaymentProvider();
+
+  if (!provider.isConfigured) {
+    throw new Error(
+      `Payment provider "${provider.name}" is not configured. Card payment is unavailable.`,
+    );
+  }
+
+  const [booking] = await db
+    .select({
+      id: bookings.id,
+      reference: bookings.reference,
+      status: bookings.status,
+      taxableSubtotalHalalas: bookings.taxableSubtotalHalalas,
+      vatHalalas: bookings.vatHalalas,
+      depositHalalas: bookings.depositHalalas,
+      totalHalalas: bookings.totalHalalas,
+      currency: bookings.currency,
+    })
+    .from(bookings)
+    .where(eq(bookings.id, params.bookingId))
+    .limit(1);
+
+  if (!booking) throw new Error("Booking not found.");
+  if (booking.status !== "pending_payment") {
+    throw new Error(`Booking ${booking.reference} is not awaiting payment.`);
+  }
+
+  // The rental charge excludes the deposit; the deposit is authorized separately.
+  const rentalAmount = booking.taxableSubtotalHalalas + booking.vatHalalas;
+  const paymentId = uuidv7();
+  const idempotencyKey = `pay_${booking.id}_rental`;
+
+  await db
+    .insert(payments)
+    .values({
+      id: paymentId,
+      bookingId: booking.id,
+      kind: "rental_charge",
+      provider: provider.name,
+      status: "created",
+      amountHalalas: rentalAmount,
+      currency: booking.currency,
+      idempotencyKey,
+    })
+    .onConflictDoNothing({ target: payments.idempotencyKey });
+
+  // A retried start must reuse the existing row rather than orphaning it.
+  const [row] = await db
+    .select({ id: payments.id })
+    .from(payments)
+    .where(eq(payments.idempotencyKey, idempotencyKey))
+    .limit(1);
+  const effectivePaymentId = row?.id ?? paymentId;
+
+  const intent = await provider.createIntent({
+    paymentId: effectivePaymentId,
+    bookingReference: booking.reference,
+    amountHalalas: rentalAmount,
+    currency: booking.currency,
+    description: `Equipment rental ${booking.reference}`,
+    mode: "charge",
+    customer: params.customer,
+    returnUrl: params.returnUrl,
+    idempotencyKey,
+    locale: params.locale,
+  });
+
+  await db
+    .update(payments)
+    .set({ providerIntentId: intent.providerIntentId, updatedAt: new Date() })
+    .where(eq(payments.id, effectivePaymentId));
+
+  return { rental: intent, paymentId: effectivePaymentId };
+}
+
+export type WebhookOutcome =
+  | { handled: true; result: string }
+  | { handled: false; reason: string };
+
+/**
+ * PROCESS A VERIFIED WEBHOOK.
+ *
+ * The ONLY way a booking becomes `confirmed`. Client-reported payment status is
+ * discarded entirely — a browser POSTing "I paid" changes nothing, because the
+ * confirmation path starts from a signature the browser cannot produce.
+ *
+ * Defences applied here, in order:
+ *   1. Signature verified by the caller before this is reached (the
+ *      `VerifiedWebhookEvent` type can only be produced by `verifyWebhook`)
+ *   2. REPLAY — a UNIQUE index on (provider, providerEventId); a duplicate
+ *      violates it and is discarded rather than crediting twice
+ *   3. AMOUNT and CURRENCY compared against the stored booking, so a
+ *      tampered-but-validly-signed event still cannot underpay a rental
+ */
+export async function processWebhookEvent(
+  providerName: string,
+  event: VerifiedWebhookEvent,
+): Promise<WebhookOutcome> {
+  // --- 2. Replay defence ---------------------------------------------------
+  const eventRowId = uuidv7();
+  try {
+    await db.insert(paymentWebhookEvents).values({
+      id: eventRowId,
+      provider: providerName,
+      providerEventId: event.providerEventId,
+      eventType: event.type,
+      signatureVerified: true,
+      payloadHash: event.rawPayloadHash,
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { handled: false, reason: "duplicate_event" };
+    }
+    throw error;
+  }
+
+  const [payment] = await db
+    .select({
+      id: payments.id,
+      bookingId: payments.bookingId,
+      kind: payments.kind,
+      status: payments.status,
+      amountHalalas: payments.amountHalalas,
+      currency: payments.currency,
+    })
+    .from(payments)
+    .where(eq(payments.providerIntentId, event.providerIntentId))
+    .limit(1);
+
+  if (!payment) {
+    await markEventProcessed(eventRowId, "unknown_intent");
+    return { handled: false, reason: "unknown_intent" };
+  }
+
+  // --- 3. Amount and currency must match -----------------------------------
+  // A signed event whose amount does not match the booking is either a
+  // provider-side inconsistency or a compromised signing key. Either way it is
+  // not a basis for confirming a rental.
+  if (event.amountHalalas !== payment.amountHalalas || event.currency !== payment.currency) {
+    await markEventProcessed(eventRowId, "amount_mismatch");
+    await writeAudit({
+      action: "payment.amount_mismatch",
+      actorType: "webhook",
+      resourceType: "payment",
+      resourceId: payment.id,
+      outcome: "denied",
+      metadata: {
+        expectedHalalas: payment.amountHalalas.toString(),
+        receivedHalalas: event.amountHalalas.toString(),
+        expectedCurrency: payment.currency,
+        receivedCurrency: event.currency,
+      },
+    });
+    return { handled: false, reason: "amount_mismatch" };
+  }
+
+  const now = new Date();
+
+  switch (event.status) {
+    case "captured": {
+      await db
+        .update(payments)
+        .set({
+          status: "captured",
+          capturedHalalas: event.amountHalalas,
+          providerChargeId: event.providerChargeId ?? null,
+          method: event.method ?? null,
+          last4: event.last4 ?? null,
+          cardBrandLabel: event.cardBrandLabel ?? null,
+          capturedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(payments.id, payment.id));
+
+      if (payment.kind === "rental_charge") {
+        // Compare-and-set: an out-of-order or replayed event cannot resurrect
+        // a cancelled booking.
+        await transitionBooking({
+          bookingId: payment.bookingId,
+          toStatus: "confirmed",
+          expectedFrom: ["pending_payment"],
+          actorType: "webhook",
+          type: "payment.captured",
+          metadata: { paymentId: payment.id, providerEventId: event.providerEventId },
+        });
+      }
+
+      await writeAudit({
+        action: "payment.captured",
+        actorType: "webhook",
+        resourceType: "payment",
+        resourceId: payment.id,
+        outcome: "success",
+        metadata: { bookingId: payment.bookingId, amountHalalas: event.amountHalalas.toString() },
+      });
+
+      await markEventProcessed(eventRowId, "captured");
+      return { handled: true, result: "captured" };
+    }
+
+    case "authorized": {
+      await db
+        .update(payments)
+        .set({
+          status: "authorized",
+          providerChargeId: event.providerChargeId ?? null,
+          method: event.method ?? null,
+          last4: event.last4 ?? null,
+          authorizedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(payments.id, payment.id));
+      await markEventProcessed(eventRowId, "authorized");
+      return { handled: true, result: "authorized" };
+    }
+
+    case "failed": {
+      await db
+        .update(payments)
+        .set({
+          status: "failed",
+          failureCode: event.failureCode ?? null,
+          failureMessage: event.failureMessage?.slice(0, 400) ?? null,
+          updatedAt: now,
+        })
+        .where(eq(payments.id, payment.id));
+
+      await writeAudit({
+        action: "payment.failed",
+        actorType: "webhook",
+        resourceType: "payment",
+        resourceId: payment.id,
+        outcome: "failure",
+        metadata: { bookingId: payment.bookingId, failureCode: event.failureCode ?? null },
+      });
+
+      // The booking stays `pending_payment` so the customer can retry with a
+      // different card. Its reservation hold still protects the machine.
+      await markEventProcessed(eventRowId, "failed");
+      return { handled: true, result: "failed" };
+    }
+
+    case "voided": {
+      await db
+        .update(payments)
+        .set({ status: "voided", voidedAt: now, updatedAt: now })
+        .where(eq(payments.id, payment.id));
+      await markEventProcessed(eventRowId, "voided");
+      return { handled: true, result: "voided" };
+    }
+
+    default: {
+      await markEventProcessed(eventRowId, `ignored_${event.status}`);
+      return { handled: false, reason: `unhandled_status_${event.status}` };
+    }
+  }
+}
+
+async function markEventProcessed(eventRowId: string, result: string): Promise<void> {
+  await db
+    .update(paymentWebhookEvents)
+    .set({ processedAt: new Date(), processingResult: result })
+    .where(eq(paymentWebhookEvents.id, eventRowId));
+}
+
+/**
+ * Record an unverifiable webhook for forensics WITHOUT acting on it.
+ *
+ * Silently dropping forged webhooks loses the signal that someone is
+ * attempting forgery — a spike here is exactly what monitoring should alert on.
+ */
+export async function recordUnverifiedWebhook(
+  providerName: string,
+  payloadHash: string,
+  reason: string,
+): Promise<void> {
+  await db
+    .insert(paymentWebhookEvents)
+    .values({
+      id: uuidv7(),
+      provider: providerName,
+      // Namespaced so a forged event id cannot collide with a real one and
+      // thereby suppress a genuine webhook via the replay defence.
+      providerEventId: `unverified_${payloadHash.slice(0, 32)}`,
+      eventType: "unverified",
+      signatureVerified: false,
+      payloadHash,
+      processedAt: new Date(),
+      processingResult: reason,
+    })
+    .onConflictDoNothing();
+
+  await writeAudit({
+    action: "payment.webhook_verification_failed",
+    actorType: "webhook",
+    resourceType: "payment_webhook",
+    resourceId: payloadHash.slice(0, 32),
+    outcome: "denied",
+    metadata: { provider: providerName, reason },
+  });
+}
+
+/** Total captured against a booking, for display and reconciliation. */
+export async function capturedTotal(bookingId: string): Promise<Halalas> {
+  const rows = await db.execute<{ total: string | null }>(raw`
+    SELECT COALESCE(SUM(captured_halalas), 0)::text AS total
+    FROM payment
+    WHERE booking_id = ${bookingId} AND status IN ('captured', 'partially_refunded')
+  `);
+  return BigInt(rows[0]?.total ?? "0");
+}

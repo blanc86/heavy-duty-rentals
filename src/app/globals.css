@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/*
+ * DESIGN SYSTEM
+ *
+ * Industrial, not decorative. The visual language has to say "this company
+ * runs 200-tonne cranes safely", which means high contrast, dense information,
+ * and restraint — not gradients and motion.
+ *
+ * Everything is a token. Components never hardcode a colour.
+ */
+@theme {
+  /* Neutrals — the structural palette. Cool grey, reads as engineered. */
+  --color-steel-50: oklch(0.985 0.002 250);
+  --color-steel-100: oklch(0.967 0.003 250);
+  --color-steel-200: oklch(0.925 0.005 250);
+  --color-steel-300: oklch(0.865 0.008 250);
+  --color-steel-400: oklch(0.705 0.012 250);
+  --color-steel-500: oklch(0.556 0.014 250);
+  --color-steel-600: oklch(0.442 0.014 250);
+  --color-steel-700: oklch(0.365 0.013 250);
+  --color-steel-800: oklch(0.268 0.011 250);
+  --color-steel-900: oklch(0.198 0.010 250);
+  --color-steel-950: oklch(0.135 0.008 250);
+
+  /*
+   * Safety amber — the single accent, reserved for PRIMARY ACTIONS ONLY.
+   * It is the colour of the machinery itself, and using it for anything
+   * decorative would drain it of meaning exactly where conversion depends on
+   * the eye landing on the right button.
+   */
+  --color-amber-400: oklch(0.828 0.152 78);
+  --color-amber-500: oklch(0.760 0.170 68);
+  --color-amber-600: oklch(0.681 0.166 58);
+  --color-amber-700: oklch(0.567 0.145 52);
+
+  /* Status. Semantic only — never used as decoration. */
+  --color-available: oklch(0.606 0.145 152);
+  --color-available-bg: oklch(0.955 0.032 152);
+  --color-warning: oklch(0.735 0.150 72);
+  --color-warning-bg: oklch(0.965 0.040 82);
+  --color-danger: oklch(0.585 0.198 25);
+  --color-danger-bg: oklch(0.958 0.030 22);
+  --color-info: oklch(0.588 0.126 245);
+  --color-info-bg: oklch(0.958 0.025 245);
+
+  --font-sans: var(--font-app-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* A deliberately small type scale: dense B2B tables need consistency more
+     than expressive range. */
+  --text-2xs: 0.6875rem;
+
+  --radius-card: 0.5rem;
+  --radius-control: 0.375rem;
+
+  /* Shadows are structural (elevation), never atmospheric. */
+  --shadow-card: 0 1px 2px 0 oklch(0.135 0.008 250 / 0.06), 0 1px 3px 0 oklch(0.135 0.008 250 / 0.08);
+  --shadow-raised: 0 4px 12px -2px oklch(0.135 0.008 250 / 0.10), 0 2px 4px -2px oklch(0.135 0.008 250 / 0.06);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    background-color: var(--color-steel-50);
+    color: var(--color-steel-900);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Arabic needs a slightly larger optical size and looser leading than Latin
+   * at the same nominal size; without this, Arabic body copy reads cramped.
+   */
+  [dir="rtl"] body {
+    font-size: 1.02em;
+    line-height: 1.75;
+  }
+
+  /*
+   * Arabic-Indic digits inside otherwise-Latin UI (a serial number, an asset
+   * code, an ISO date) hurt scannability. These stay Latin in both locales.
+   */
+  .numeric-latin {
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: embed;
+  }
+
+  /* Tabular figures keep price columns aligned. */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* WCAG 2.2 focus visibility — never removed, only styled. */
+  :focus-visible {
+    outline: 2px solid var(--color-amber-600);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background-color: var(--color-amber-400);
+    color: var(--color-steel-950);
+  }
+}
+
+@layer components {
+  /* Skip link — first tab stop, visible only when focused. */
+  .skip-link {
+    position: absolute;
+    inset-inline-start: 0.5rem;
+    top: -3rem;
+    z-index: 100;
+    border-radius: var(--radius-control);
+    background-color: var(--color-steel-900);
+    padding: 0.5rem 1rem;
+    color: white;
+    transition: top 150ms;
+  }
+  .skip-link:focus {
+    top: 0.5rem;
+  }
+
+  /*
+   * A grid that never overflows its container horizontally on small screens.
+   * Wide content (spec tables, comparison) scrolls inside its own wrapper —
+   * the page body must never scroll sideways.
+   */
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}
+
+/*
+ * RTL MIRRORING
+ *
+ * Handled by Tailwind's logical properties (ms-/me-/ps-/pe-/start-/end-)
+ * rather than a duplicated RTL stylesheet, so there is exactly one layout to
+ * maintain. The few genuinely directional glyphs are flipped here.
+ */
+[dir="rtl"] .flip-in-rtl {
+  transform: scaleX(-1);
+}
