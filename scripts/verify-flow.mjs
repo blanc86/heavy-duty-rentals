@@ -99,6 +99,18 @@ async function main() {
     "no fabricated aggregateRating is emitted",
     !detailHtml.includes("aggregateRating"),
   );
+  // CSP applies to every <script>, a ld+json data block included. Unnonced, it
+  // is refused and a crawler rendering under CSP never sees the structured
+  // data — silently, because the markup is still there in the source.
+  check(
+    "JSON-LD carries the CSP nonce",
+    /<script[^>]*application\/ld\+json[^>]*nonce="/.test(detailHtml) ||
+      /<script[^>]*nonce="[^"]*"[^>]*application\/ld\+json/.test(detailHtml),
+  );
+  check(
+    "every script on the page is nonced",
+    (detailHtml.match(/<script[^>]*>/g) ?? []).every((tag) => tag.includes("nonce=")),
+  );
 
   const arabic = await req("/ar/equipment/item/all-terrain-crane-100t");
   const arabicHtml = await arabic.text();

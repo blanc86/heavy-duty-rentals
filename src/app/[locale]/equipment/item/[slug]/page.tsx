@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cspNonce } from "@/lib/seo/nonce";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { RentalConfigurator } from "@/components/booking/rental-configurator";
@@ -123,6 +124,11 @@ export default async function EquipmentDetailPage({
     <>
       <script
         type="application/ld+json"
+        // CSP applies to every <script>, including a ld+json data block that
+        // never executes. Without the nonce the block is refused and a crawler
+        // rendering under CSP never sees the structured data — silently, since
+        // the markup is still present in the HTML source.
+        nonce={await cspNonce()}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify([
             equipmentJsonLd({
@@ -182,8 +188,15 @@ export default async function EquipmentDetailPage({
         <div className="grid gap-8 lg:grid-cols-[1fr_24rem] xl:grid-cols-[1fr_26rem]">
           {/* ---------------------------------------------------------------
               LEFT: the machine
+
+              `min-w-0` is load-bearing. A grid item defaults to
+              `min-width: auto`, so the widest thing inside — the spec table —
+              sets a floor for the column instead of scrolling within its own
+              `ScrollX`. Without it the column measured 384px inside a 375px
+              phone and the whole PAGE scrolled sideways, which is the one
+              thing `ScrollX` exists to prevent.
           --------------------------------------------------------------- */}
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-start gap-3">
               <div className="flex-1">
                 <p className="text-sm font-medium uppercase tracking-wide text-steel-500">

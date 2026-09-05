@@ -55,9 +55,11 @@ export function SiteFooter({
       links: [
         { href: "/how-it-works", label: dict.nav.howItWorks },
         { href: "/faq", label: dict.nav.faq },
+        // "Support" used to sit here pointing at /account/support, a console
+        // that does not exist — a 404 in the footer of every page. Contact IS
+        // the support surface, and it is already listed directly above, so the
+        // duplicate entry is gone rather than repointed at the same URL.
         { href: "/contact", label: dict.nav.contact },
-        // Support is the contact page; there is no separate support console.
-        { href: "/contact", label: dict.account.support },
       ],
     },
     {

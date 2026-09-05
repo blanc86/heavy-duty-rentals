@@ -56,10 +56,23 @@ function negotiateLocale(request: NextRequest): string {
 function buildCsp(nonce: string, isDev: boolean): string {
   return [
     "default-src 'self'",
-    // 'strict-dynamic' means scripts loaded BY a nonced script are trusted,
-    // which is what lets Next.js load its chunks without allowlisting hosts.
-    // 'unsafe-eval' is dev-only: React Refresh needs it, production must not.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    // PRODUCTION: 'strict-dynamic' means scripts loaded BY a nonced script are
+    // trusted, which is what lets Next.js load its chunks without allowlisting
+    // hosts. Host-source expressions like 'self' are then ignored entirely.
+    //
+    // DEVELOPMENT: that is exactly the problem. Turbopack's hot-reload client
+    // is served from this origin but is not nonced, so 'strict-dynamic' blocks
+    // it and hot reload silently stops working — the server keeps compiling
+    // while the browser keeps showing the previous build, which reads like a
+    // caching bug and costs an afternoon. Dropping 'strict-dynamic' in dev
+    // restores 'self', which covers those chunks. 'unsafe-eval' is also
+    // dev-only: React Refresh needs it.
+    //
+    // The nonce stays in both, so the production path is exercised in dev and
+    // the JSON-LD blocks are nonced everywhere.
+    isDev
+      ? `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`
+      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     // KNOWN RESIDUAL: React writes inline style attributes, so 'unsafe-inline'
     // stays here. It does NOT weaken script-src, which is where XSS lives.
     // Documented in docs/SECURITY.md §5.

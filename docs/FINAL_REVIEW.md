@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Sixteen bugs found and fixed during the build
+## 2. Nineteen bugs found and fixed during the build
 
-Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, and four more from following every link the site renders.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, and three from measuring the layout at 375px and reading the browser console.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -115,6 +115,14 @@ The route sweep only checks URLs someone remembered to put in it, so it now also
 **Comparison was an unbuilt "Must".** PRD C5 — "Compare up to 4 classes side by side, with Book CTA per column" — is marked **M**, and the PRD's own scope line lists "comparison" as delivered. It was not: no page, no component, only a full set of unused dictionary keys and a footer link to a 404. Built it. The selection lives in `localStorage` (a disposable scratchpad) but the comparison itself is a URL, so an engineer can paste `/compare?items=…` to a procurement manager and it still works. The table takes the **union** of specs across the selected machines rather than the intersection — comparing only shared labels would silently drop the specification that decides the choice — and every column carries its own CTA, which correctly reads "Request a quote" for a class above the instant-book threshold and "Check availability" below it.
 
 **Two seed-data errors the comparison table exposed.** A dewatering pump and an air compressor both advertised "Output: 0 kVA" — a machine that produces nothing, which is worse than saying nothing — and every sub-tonne machine rendered as "0.15 t" because capacity was divided by 1000 unconditionally. The seed no longer writes zero-valued specs at all, capacity is written in kilograms below a tonne, and a `formatCapacity` helper applies the same rule everywhere it is displayed. The fleet spans a 300 t crawler crane and a 150 kg pump; one divisor was never going to serve both.
+
+### Found by testing at 375px and reading the console
+
+**The equipment page scrolled sideways on a phone.** Measured at 375px, the page was 416px wide in both locales. The cause was not the table but the grid around it: a grid item defaults to `min-width: auto`, so the widest thing inside sets a floor for the column, and `ScrollX`'s `overflow-x` never got a chance to act. `min-w-0` on the column fixes it, and the table now scrolls inside its own box — which is the one thing that component exists to do. The tax invoice had the same defect from a bare unwrapped `<table>`; it now scrolls inside a container, with `print:overflow-visible` so a printer still gets the whole table. Every other page — home, catalog, item, checkout, account, booking, comparison, both locales — measures clean at 375px.
+
+**Every JSON-LD block was being refused by our own CSP.** The policy is `script-src 'self' 'nonce-…' 'strict-dynamic'`, and CSP applies to *every* `<script>` element — including a `type="application/ld+json"` data block that never executes. Next.js nonces its own 18 script tags; the twelve structured-data blocks the application renders were not nonced, so a crawler rendering with CSP enforced would see none of them. This is the worst kind of silent: the markup is present in the HTML, so viewing source passes, and `verify-flow`'s existing check that `"@type":"Product"` appears in the body passed too. All twelve now go through a `cspNonce()` helper, and two new assertions check that the JSON-LD is nonced and that no script on the page is missing one.
+
+**Hot reload had been dead the whole time.** `strict-dynamic` disables host-source expressions, so `'self'` stops applying — and Turbopack's hot-reload client, served from this origin but not nonced, was blocked. The server kept compiling while the browser kept showing the previous build, which presents as a caching bug and cost real time before the console explained it. Development now omits `strict-dynamic` (keeping the nonce, so the production path is still exercised); production is byte-identical.
 
 ---
 

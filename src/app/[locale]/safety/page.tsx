@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cspNonce } from "@/lib/seo/nonce";
 import { notFound } from "next/navigation";
 import { Alert, Card, CardBody, Container, SectionHeading } from "@/components/ui";
 import { getDictionary } from "@/lib/i18n";
@@ -82,6 +83,11 @@ export default async function SafetyPage({ params }: { params: Promise<{ locale:
     <>
       <script
         type="application/ld+json"
+        // CSP applies to every <script>, including a ld+json data block that
+        // never executes. Without the nonce the block is refused and a crawler
+        // rendering under CSP never sees the structured data — silently, since
+        // the markup is still present in the HTML source.
+        nonce={await cspNonce()}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(
             breadcrumbJsonLd([

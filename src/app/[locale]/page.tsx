@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cspNonce } from "@/lib/seo/nonce";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { EquipmentCard } from "@/components/equipment/equipment-card";
@@ -61,6 +62,11 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     <>
       <script
         type="application/ld+json"
+        // CSP applies to every <script>, including a ld+json data block that
+        // never executes. Without the nonce the block is refused and a crawler
+        // rendering under CSP never sees the structured data — silently, since
+        // the markup is still present in the HTML source.
+        nonce={await cspNonce()}
         // Structured data describing what this page genuinely is. Nothing here
         // asserts a rating, a review count, or a credential the business has
         // not supplied.

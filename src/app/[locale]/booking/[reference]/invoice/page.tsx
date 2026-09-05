@@ -145,7 +145,13 @@ export default async function InvoicePage({
           )}
         </section>
 
-        <table className="mt-8 w-full text-sm">
+        {/* The line-item table does not fit a 375px phone, and this page is
+            read on one as often as it is printed. Scrolling it inside its own
+            box keeps the invoice legible without the whole document sliding
+            sideways. `print:overflow-visible` so a printer still gets the
+            complete table rather than a clipped one. */}
+        <div className="mt-8 overflow-x-auto print:overflow-visible">
+          <table className="w-full min-w-[30rem] text-sm print:min-w-0">
           <thead>
             <tr className="border-y border-steel-300">
               <th scope="col" className="py-2 text-start font-semibold text-steel-700">
@@ -206,7 +212,8 @@ export default async function InvoicePage({
               </td>
             </tr>
           </tfoot>
-        </table>
+          </table>
+        </div>
 
         {/* The deposit is NOT on the invoice: it is refundable, is not revenue,
             and carries no VAT. Including it would overstate taxable turnover. */}

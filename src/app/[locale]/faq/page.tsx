@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cspNonce } from "@/lib/seo/nonce";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { Container, SectionHeading } from "@/components/ui";
@@ -57,6 +58,11 @@ export default async function FaqPage({ params }: { params: Promise<{ locale: st
     <>
       <script
         type="application/ld+json"
+        // CSP applies to every <script>, including a ld+json data block that
+        // never executes. Without the nonce the block is refused and a crawler
+        // rendering under CSP never sees the structured data — silently, since
+        // the markup is still present in the HTML source.
+        nonce={await cspNonce()}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify(
             [
