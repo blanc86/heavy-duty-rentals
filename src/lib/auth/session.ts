@@ -140,7 +140,9 @@ async function resolveSession(): Promise<ResolvedSession | null> {
     .limit(1);
 
   if (!row) return null;
-  // A suspended user's existing sessions must stop working immediately.
+  // A suspended user's existing sessions must stop working immediately —
+  // checked on every request rather than at sign-in, so suspending an account
+  // takes effect now instead of whenever its session happens to expire.
   if (row.status !== "active") return null;
 
   // Enrolment is read fresh on every request rather than baked into the

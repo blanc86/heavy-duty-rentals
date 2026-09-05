@@ -3,6 +3,7 @@ import type { AuthenticatedActor } from "@/lib/auth/session";
 import type { Dictionary } from "@/lib/i18n";
 import { localePath, otherLocale, type Locale } from "@/lib/i18n/config";
 import { LocaleSwitch } from "./locale-switch";
+import { SignOutButton } from "./sign-out-button";
 import { MobileNav } from "./mobile-nav";
 
 /**
@@ -97,6 +98,9 @@ export function SiteHeader({
               >
                 {dict.nav.dashboard}
               </Link>
+              <div className="hidden sm:block">
+                <SignOutButton locale={locale} label={dict.nav.logout} />
+              </div>
             </>
           ) : (
             <Link
@@ -125,6 +129,15 @@ export function SiteHeader({
             openLabel={dict.a11y.openMenu}
             closeLabel={dict.common.close}
             menuLabel={dict.nav.menu}
+            signOut={
+              actor ? (
+                <SignOutButton
+                  locale={locale}
+                  label={dict.nav.logout}
+                  className="w-full rounded-[--radius-control] px-3 py-3 text-center text-sm font-medium text-steel-700 hover:bg-steel-100"
+                />
+              ) : undefined
+            }
           />
         </div>
       </div>

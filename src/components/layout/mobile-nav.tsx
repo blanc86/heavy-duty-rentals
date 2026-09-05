@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Locale } from "@/lib/i18n/config";
 
 /**
@@ -18,6 +18,7 @@ export function MobileNav({
   openLabel,
   closeLabel,
   menuLabel,
+  signOut,
 }: {
   locale: Locale;
   items: { href: string; label: string }[];
@@ -26,6 +27,14 @@ export function MobileNav({
   openLabel: string;
   closeLabel: string;
   menuLabel: string;
+  /**
+   * The sign-out form, rendered on the SERVER and passed in as a slot.
+   *
+   * A Server Action form cannot be constructed inside a client component, and
+   * this drawer must stay a client component for the <dialog> behaviour — so
+   * the server hands the finished element down instead.
+   */
+  signOut?: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
@@ -102,6 +111,7 @@ export function MobileNav({
                   {accountLabel}
                 </Link>
               </li>
+              {signOut && <li className="pt-1">{signOut}</li>}
             </ul>
           </nav>
         </div>

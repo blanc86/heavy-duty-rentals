@@ -74,9 +74,26 @@ export async function registerAction(input: unknown): Promise<ActionResult> {
               phone: data.phone ?? null,
               passwordHash,
               preferredLocale: data.locale,
-              // Email verification is a separate step. Registering does not
-              // grant a verified identity.
-              status: "pending_verification",
+
+              // ACTIVE on registration, with `emailVerifiedAt` left null.
+              //
+              // The account is usable; the email address is recorded as
+              // unproven, which is the truth. Registering as
+              // `pending_verification` instead would be a dead end today:
+              // `resolveSession` grants no actor to a non-active user, so a new
+              // customer would receive a valid session, be redirected to
+              // /account, be bounced straight back to sign-in, and loop there
+              // — with no verification email to escape it, because the
+              // notification layer is not built (docs/FINAL_REVIEW.md §3).
+              //
+              // What actually guards identity here is downstream and stronger
+              // than an email click: a booking requires a successful card
+              // payment, and the machine is not released without an ID check at
+              // handover (docs/SECURITY.md §8). When the email transport lands,
+              // `emailVerifiedAt` is the column that flips, and gating whatever
+              // then needs a proven address is a smaller change than this
+              // comment.
+              status: "active",
               marketingConsentAt: data.marketingConsent ? new Date() : null,
               marketingConsentSource: data.marketingConsent ? "registration" : null,
               marketingConsentIp: data.marketingConsent ? (ip ?? null) : null,

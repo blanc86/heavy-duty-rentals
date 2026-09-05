@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge, ButtonLink, Card, CardBody, Container, EmptyState, ScrollX } from "@/components/ui";
+import { SignOutButton } from "@/components/layout/sign-out-button";
 import { getActor } from "@/lib/auth/session";
 import { bookingCountsForActor, listBookingsForActor } from "@/lib/booking/repository";
 import { getDictionary } from "@/lib/i18n";
@@ -74,7 +75,15 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           </h1>
           <p className="mt-1 text-sm text-steel-600">{actor.fullName}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {/* Sign-out belongs here as well as in the header: this is the page
+              people open when they want to deal with their account, and on a
+              shared depot machine it is the one control they need to find. */}
+          <SignOutButton
+            locale={locale}
+            label={dict.nav.logout}
+            className="rounded-[--radius-control] border border-steel-300 px-4 py-2 text-sm font-medium text-steel-800 transition-colors hover:bg-steel-100"
+          />
           <ButtonLink href={localePath(locale, "/account/security")} variant="ghost" size="md">
             {dict.account.security}
           </ButtonLink>
