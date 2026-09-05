@@ -171,6 +171,48 @@ async function main() {
     console.log("");
   }
 
+  // --- Link check ---------------------------------------------------------
+  // Every internal href the public pages actually render, followed once. A
+  // dead internal link is invisible to the route list above, because the route
+  // list only contains URLs someone remembered to add to it.
+  cookies = "";
+  const seen = new Set();
+  const sources = new Map();
+
+  for (const route of publicRoutes) {
+    for (const locale of ["en", "ar"]) {
+      const resolved = typeof route === "function" ? route(locale) : route;
+      if (resolved === null || resolved === undefined) continue;
+
+      const from = `/${locale}${resolved}`;
+      const html = await (await req(from)).text();
+      for (const match of html.matchAll(/href="(\/[^"#?]*)"/g)) {
+        const href = match[1];
+        // Skip API and asset routes: they are not pages and answer differently.
+        if (href.startsWith("/_next") || href.startsWith("/api")) continue;
+        if (seen.has(href)) continue;
+        seen.add(href);
+        sources.set(href, from);
+      }
+    }
+  }
+
+  console.log(`--- internal links (${seen.size} distinct) ---`);
+  let broken = 0;
+  for (const href of [...seen].sort()) {
+    const response = await req(href);
+    // 200 is fine; 307 is fine for a link into an authenticated area, since
+    // this pass is deliberately anonymous. A 404 or 500 is a dead link.
+    const ok = response.status === 200 || response.status === 307;
+    if (!ok) {
+      broken += 1;
+      failures.push(`${href} -> ${response.status} (linked from ${sources.get(href)})`);
+      console.log(`FAIL  ${href} — ${response.status} (from ${sources.get(href)})`);
+    }
+  }
+  if (broken === 0) console.log(`PASS  every internal link resolves`);
+  console.log("");
+
   if (failures.length === 0) {
     console.log("All routes returned 200.");
   } else {

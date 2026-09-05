@@ -55,6 +55,20 @@ export function formatNumber(value: number, locale: Locale, opts?: Intl.NumberFo
   return new Intl.NumberFormat(LOCALE_CONFIG[locale].intlLocale, opts).format(value);
 }
 
+/**
+ * Format a rated capacity for display.
+ *
+ * Tonnes above a tonne, kilograms below it. The fleet spans a 300 t crawler
+ * crane and a 150 kg dewatering pump, and dividing everything by 1000 renders
+ * the small machines as "0.15 t" — a number that reads as "almost nothing"
+ * rather than as a capacity, and that no one in this industry would write.
+ */
+export function formatCapacity(capacityKg: number, locale: Locale): string {
+  return capacityKg < 1000
+    ? `${formatNumber(capacityKg, locale)} kg`
+    : `${formatNumber(capacityKg / 1000, locale)} t`;
+}
+
 /** Build a locale-prefixed path. Every internal link goes through this. */
 export function localePath(locale: Locale, path: string): string {
   const clean = path.startsWith("/") ? path : `/${path}`;

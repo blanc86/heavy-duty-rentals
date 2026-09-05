@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CompareTray } from "@/components/equipment/compare-tray";
 import { EquipmentCard } from "@/components/equipment/equipment-card";
 import { Alert, Container, EmptyState, SectionHeading } from "@/components/ui";
 import { getCategoryBySlug, listCategories, searchClasses } from "@/lib/catalog/repository";
@@ -156,6 +157,9 @@ export default async function CategoryPage({
           </ul>
         </section>
       </Container>
+
+      {/* Fixed-position tray; renders nothing until two machines are picked. */}
+      <CompareTray locale={locale} dict={dict} />
     </>
   );
 }

@@ -157,6 +157,7 @@ export const ar: Dictionary = {
     operator: "المشغل",
     operatorAvailable: "المشغل متوفر",
     operatorRequired: "المشغل إلزامي",
+    fuel: "الوقود",
     fuelWet: "الوقود مشمول (تأجير شامل)",
     fuelDry: "الوقود غير مشمول (تأجير غير شامل)",
     minRental: "الحد الأدنى لمدة التأجير",

@@ -149,6 +149,7 @@ export const en = {
     operator: "Operator",
     operatorAvailable: "Operator available",
     operatorRequired: "Operator required",
+    fuel: "Fuel",
     fuelWet: "Fuel included (wet rental)",
     fuelDry: "Fuel not included (dry rental)",
     minRental: "Minimum rental",

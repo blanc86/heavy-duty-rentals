@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Badge, Card, DemoBadge } from "@/components/ui";
+import { CompareToggle } from "./compare-tray";
 import type { ClassSummary } from "@/lib/catalog/repository";
 import type { Dictionary } from "@/lib/i18n";
-import { formatNumber, localePath, type Locale } from "@/lib/i18n/config";
+import { formatCapacity, formatNumber, localePath, type Locale } from "@/lib/i18n/config";
 import { illustrationUrl } from "@/lib/media/equipment-illustration";
 import { formatMoneyCompact } from "@/lib/money";
 
@@ -32,7 +33,7 @@ export function EquipmentCard({
   const href =
     localePath(locale, `/equipment/item/${item.slug}`) + (searchParams ? `?${searchParams}` : "");
 
-  const capacityTons = item.capacityKg ? item.capacityKg / 1000 : null;
+
 
   return (
     <Card className="group flex flex-col overflow-hidden transition-shadow hover:shadow-[--shadow-raised]">
@@ -80,11 +81,11 @@ export function EquipmentCard({
         </p>
 
         <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          {capacityTons !== null && (
+          {item.capacityKg !== null && (
             <div className="flex gap-1">
               <dt className="text-steel-500">{dict.equipment.capacity}:</dt>
               <dd className="font-medium text-steel-900 numeric-latin">
-                {formatNumber(capacityTons, locale)} t
+                {formatCapacity(item.capacityKg, locale)}
               </dd>
             </div>
           )}
@@ -140,6 +141,12 @@ export function EquipmentCard({
           <span className="relative z-10 inline-flex min-h-[2.25rem] shrink-0 items-center whitespace-nowrap rounded-[--radius-control] bg-steel-900 px-3 text-sm font-semibold text-white transition-colors group-hover:bg-amber-500 group-hover:text-steel-950">
             {item.instantBookable ? dict.equipment.checkAvailability : dict.equipment.requestQuote}
           </span>
+        </div>
+
+        {/* `relative z-10` so this sits above the card's stretched title link,
+            which otherwise swallows the click and navigates instead. */}
+        <div className="relative z-10 mt-3 border-t border-steel-100 pt-3">
+          <CompareToggle slug={item.slug} dict={dict} />
         </div>
       </div>
     </Card>

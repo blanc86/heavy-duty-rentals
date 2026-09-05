@@ -19,7 +19,7 @@ import { getClassBySlug, listBranches, searchClasses } from "@/lib/catalog/repos
 import { db } from "@/lib/db";
 import { addonOptions } from "@/lib/db/schema/pricing";
 import { getDictionary } from "@/lib/i18n";
-import { formatNumber, isLocale, localePath, type Locale } from "@/lib/i18n/config";
+import { formatCapacity, formatNumber, isLocale, localePath, type Locale } from "@/lib/i18n/config";
 import { illustrationUrl } from "@/lib/media/equipment-illustration";
 import { formatMoneyCompact } from "@/lib/money";
 import { breadcrumbJsonLd, equipmentJsonLd } from "@/lib/seo/json-ld";
@@ -204,7 +204,7 @@ export default async function EquipmentDetailPage({
                 <Badge tone="neutral">
                   {dict.equipment.capacity}:{" "}
                   <span className="numeric-latin">
-                    {formatNumber(item.capacityKg / 1000, locale)} t
+                    {formatCapacity(item.capacityKg, locale)}
                   </span>
                 </Badge>
               )}

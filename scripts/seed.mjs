@@ -477,7 +477,7 @@ const CLASSES = [
     rates: { daily: 340, weekly: 1870, monthly: 6120 },
     descEn: "Towable diesel screw compressor for pneumatic breakers, sand blasting and general site tooling.",
     descAr: "ضاغط هواء لولبي يعمل بالديزل وقابل للسحب لكسارات الهواء المضغوط والسفع الرملي والمعدات العامة في الموقع.",
-    specs: { outputKva: 0, fuelTankL: 235, freeAirDeliveryCfm: 375, workingPressureBar: 7 },
+    specs: { fuelTankL: 235, freeAirDeliveryCfm: 375, workingPressureBar: 7 },
     incEn: ["Towing hitch", "Routine servicing during hire"],
     incAr: ["وصلة القطر", "الصيانة الدورية أثناء فترة الإيجار"],
     excEn: ["Fuel", "Air hoses and tooling", "Towing vehicle"],
@@ -493,7 +493,7 @@ const CLASSES = [
     rates: { daily: 290, weekly: 1595, monthly: 5220 },
     descEn: "Diesel-driven self-priming pump for excavation dewatering and sewer bypass. Handles solids in suspension.",
     descAr: "مضخة ذاتية التحضير تعمل بالديزل لنزح مياه الحفريات وتحويل مياه الصرف. تتعامل مع المواد الصلبة العالقة.",
-    specs: { outputKva: 0, fuelTankL: 210, maxFlowM3h: 200, maxHeadM: 24 },
+    specs: { fuelTankL: 210, maxFlowM3h: 200, maxHeadM: 24 },
     incEn: ["Suction strainer", "Routine servicing during hire"],
     incAr: ["مصفاة الشفط", "الصيانة الدورية أثناء فترة الإيجار"],
     excEn: ["Fuel", "Hoses and fittings", "Discharge permits"],
@@ -938,12 +938,27 @@ async function main() {
       for (const [key, value] of Object.entries(allSpecs)) {
         const meta = SPEC_LABELS[key];
         if (!meta || value === undefined || value === null) continue;
+        // A zero is not a specification. "Output: 0 kVA" on a water pump reads
+        // as a machine that produces nothing, rather than as a machine that
+        // does not have that property at all.
+        if (Number(value) === 0) continue;
+
         const [labelEn, labelAr, unit, divisor] = meta;
-        const displayValue = divisor > 1 ? String(Number(value) / divisor) : String(value);
+
+        // Capacity in tonnes for the crawler crane, kilograms for the pump.
+        // Dividing everything by 1000 renders a 150 kg pump as "0.15 t".
+        let displayValue;
+        let displayUnit = unit;
+        if (key === "capacityKg" && Number(value) < 1000) {
+          displayValue = String(Number(value));
+          displayUnit = "kg";
+        } else {
+          displayValue = divisor > 1 ? String(Number(value) / divisor) : String(value);
+        }
         await tx`INSERT INTO class_spec
           (id, class_id, label_en, label_ar, value_en, value_ar, unit, is_comparable, sort_order)
           VALUES (${uuidv7()}, ${classId}, ${labelEn}, ${labelAr},
-                  ${displayValue}, ${displayValue}, ${unit}, TRUE, ${specOrder++})`;
+                  ${displayValue}, ${displayValue}, ${displayUnit}, TRUE, ${specOrder++})`;
       }
 
       // Rate card + the three duration tiers. The engine picks whichever tier

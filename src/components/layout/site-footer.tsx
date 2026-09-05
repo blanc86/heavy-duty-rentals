@@ -56,7 +56,8 @@ export function SiteFooter({
         { href: "/how-it-works", label: dict.nav.howItWorks },
         { href: "/faq", label: dict.nav.faq },
         { href: "/contact", label: dict.nav.contact },
-        { href: "/account/support", label: dict.account.support },
+        // Support is the contact page; there is no separate support console.
+        { href: "/contact", label: dict.account.support },
       ],
     },
     {

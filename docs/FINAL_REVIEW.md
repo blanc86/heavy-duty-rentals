@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Twelve bugs found and fixed during the build
+## 2. Sixteen bugs found and fixed during the build
 
-Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four more from sweeping every route and every remaining form.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, and four more from following every link the site renders.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -105,6 +105,16 @@ Two fully-implemented, fully-guarded server actions with no way to reach them is
 **All three Arabic guides had never been reachable.** Next.js hands dynamic segments to the page **percent-encoded**, not decoded. ASCII kebab-case slugs encode to themselves, so this is invisible until a slug is non-ASCII — and article slugs are translated rather than transliterated, which is correct for SEO and fatal here. Every Arabic guide arrived as `%D9%85%D8%A7-…`, matched nothing, and 404'd, while the guides index linked to them happily. Fixed with `decodeSlugParam`. Separately, the language switch built `/ar/guides/<english-slug>`, which matches no article; the route now resolves a foreign-locale slug through the translation group and redirects to its counterpart.
 
 **The admin console repeated the checkout's money error.** The dashboard showed "Revenue (30d) SAR 22,977" beside a booking "Total SAR 30,977" — a reconciliation trap, since the deposit in that total is never collected online. Both admin tables now show the charged amount, which agrees with the revenue tile and the tax invoice, with the deposit listed beneath rather than folded in.
+
+### Found by following every link the site renders
+
+The route sweep only checks URLs someone remembered to put in it, so it now also collects every internal `href` the public pages actually render — 120 distinct links — and follows each one.
+
+**Two footer links 404'd on every page of the site.** `/account/support` pointed at a support console that does not exist (the contact page is the support surface, and it now points there), and `/compare` pointed at a feature that had never been built.
+
+**Comparison was an unbuilt "Must".** PRD C5 — "Compare up to 4 classes side by side, with Book CTA per column" — is marked **M**, and the PRD's own scope line lists "comparison" as delivered. It was not: no page, no component, only a full set of unused dictionary keys and a footer link to a 404. Built it. The selection lives in `localStorage` (a disposable scratchpad) but the comparison itself is a URL, so an engineer can paste `/compare?items=…` to a procurement manager and it still works. The table takes the **union** of specs across the selected machines rather than the intersection — comparing only shared labels would silently drop the specification that decides the choice — and every column carries its own CTA, which correctly reads "Request a quote" for a class above the instant-book threshold and "Check availability" below it.
+
+**Two seed-data errors the comparison table exposed.** A dewatering pump and an air compressor both advertised "Output: 0 kVA" — a machine that produces nothing, which is worse than saying nothing — and every sub-tonne machine rendered as "0.15 t" because capacity was divided by 1000 unconditionally. The seed no longer writes zero-valued specs at all, capacity is written in kilograms below a tonne, and a `formatCapacity` helper applies the same rule everywhere it is displayed. The fleet spans a 300 t crawler crane and a 150 kg pump; one divisor was never going to serve both.
 
 ---
 
