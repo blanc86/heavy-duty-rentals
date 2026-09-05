@@ -268,6 +268,12 @@ export const ar: Dictionary = {
   },
 
   account: {
+    changePassword: "تغيير كلمة المرور",
+    changePasswordBody:
+      "تغيير كلمة المرور يسجّل خروجك من جميع الأجهزة الأخرى، فتتوقف أي جلسة يحتفظ بها شخص آخر.",
+    currentPassword: "كلمة المرور الحالية",
+    newPassword: "كلمة المرور الجديدة",
+    passwordChanged: "تم تغيير كلمة المرور. تم تسجيل الخروج من الجلسات الأخرى.",
     title: "حسابي",
     dashboard: "لوحة التحكم",
     rentals: "التأجيرات",

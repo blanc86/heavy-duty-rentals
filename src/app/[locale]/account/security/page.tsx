@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ChangePassword } from "@/components/auth/change-password";
 import { MfaSetup } from "@/components/auth/mfa-setup";
 import { Card, CardBody, Container, SectionHeading } from "@/components/ui";
 import { getActor } from "@/lib/auth/session";
@@ -66,6 +67,10 @@ export default async function SecurityPage({ params }: { params: Promise<{ local
             <span className="numeric-latin">{formatDate(mfa.confirmedAt, locale)}</span>
           </p>
         )}
+
+        <div className="mt-6">
+          <ChangePassword dict={dict} />
+        </div>
 
         <Card className="mt-6">
           <CardBody>

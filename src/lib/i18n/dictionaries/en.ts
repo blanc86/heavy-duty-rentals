@@ -262,6 +262,12 @@ export const en = {
   },
 
   account: {
+    changePassword: "Change password",
+    changePasswordBody:
+      "Changing your password signs you out everywhere else, so a session someone else is holding stops working.",
+    currentPassword: "Current password",
+    newPassword: "New password",
+    passwordChanged: "Your password has been changed. Other sessions have been signed out.",
     title: "My account",
     dashboard: "Dashboard",
     rentals: "Rentals",
