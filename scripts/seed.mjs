@@ -1304,6 +1304,22 @@ async function main() {
   console.log(`  customer: customer@example.com`);
   console.log(`  password: ${process.env.SEED_ADMIN_PASSWORD || "ChangeMe_Dev_Only_123"}`);
   console.log("\nAll equipment is FICTIONAL demo data and is flagged as such in the UI.");
+
+  // The demo photographs live in class_image and are fetched separately, so a
+  // reset silently leaves every machine on its generated illustration. Saying
+  // so here beats wondering later why the photographs disappeared.
+  const [imageRow] = await sql`SELECT count(*)::int AS count FROM class_image`;
+  if (!imageRow || imageRow.count === 0) {
+    console.log(
+      [
+        "",
+        "No equipment photographs are loaded, so every machine shows its generated",
+        "technical illustration. Run `node scripts/fetch-demo-images.mjs` to pull",
+        "freely-licensed Wikimedia photos (attribution is recorded and rendered),",
+        "or load the real fleet's own.",
+      ].join("\n"),
+    );
+  }
 }
 
 main()
