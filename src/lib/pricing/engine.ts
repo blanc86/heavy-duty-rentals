@@ -179,7 +179,11 @@ export function calculatePrice(input: PricingInput): PricingResult {
     });
   }
 
-  const total = taxableSubtotal + vat + deposit;
+  // What the card is charged at checkout. The deposit is NOT part of it — it
+  // is authorized at handover, so including it here would overstate the
+  // checkout charge and disagree with the tax invoice.
+  const chargedNow = taxableSubtotal + vat;
+  const total = chargedNow + deposit;
 
   return {
     currency: input.currency,
@@ -198,6 +202,7 @@ export function calculatePrice(input: PricingInput): PricingResult {
     vatRatePpm: input.vatRatePpm,
     vatHalalas: vat,
     depositHalalas: deposit,
+    chargedNowHalalas: chargedNow,
     totalHalalas: total,
   };
 }

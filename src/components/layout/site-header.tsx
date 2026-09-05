@@ -17,11 +17,15 @@ export function SiteHeader({
   dict,
   actor,
   pathname,
+  search = "",
 }: {
   locale: Locale;
   dict: Dictionary;
   actor: AuthenticatedActor | null;
   pathname: string;
+  /** Current query string, including the leading "?". Preserved across the
+      language switch so a configured booking survives the change. */
+  search?: string;
 }) {
   const nav = [
     { href: localePath(locale, "/equipment"), label: dict.nav.equipment },
@@ -34,9 +38,12 @@ export function SiteHeader({
   // The language switch must land on the SAME page in the other locale, not
   // dump the user on the homepage — the single most common i18n failure.
   const target = otherLocale(locale);
-  const switchHref = pathname.startsWith(`/${locale}`)
+  // The query string rides along: /en/book/x?start=...&branch=... must not
+  // become /ar/book/x, which would throw away the customer's configuration.
+  const switchPath = pathname.startsWith(`/${locale}`)
     ? `/${target}${pathname.slice(locale.length + 1)}`
     : `/${target}`;
+  const switchHref = `${switchPath}${search}`;
 
   return (
     <header className="sticky top-0 z-40 border-b border-steel-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">

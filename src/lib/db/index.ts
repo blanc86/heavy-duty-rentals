@@ -77,3 +77,41 @@ export function isUniqueViolation(error: unknown): boolean {
 
 /** Exposed for tests that assert the unwrapping behaviour directly. */
 export { sqlState };
+
+/**
+ * Convert a timestamp coming out of a RAW `db.execute` query into a Date.
+ *
+ * Drizzle's postgres-js driver runs raw SQL through `client.unsafe(...)`, which
+ * bypasses the type parsers the query builder relies on. A `timestamptz` column
+ * therefore arrives as a STRING ("2026-09-08 00:00:00+00"), not a Date — even
+ * though the same column read through `db.select()` is a Date.
+ *
+ * The generic on `db.execute<T>` is an unchecked assertion, so declaring
+ * `start_date: Date` compiles happily and then explodes at runtime the first
+ * time something does date arithmetic or hands it to `Intl.DateTimeFormat`
+ * (which coerces a string to NaN and throws "Invalid time value").
+ *
+ * So: declare these columns as `string` in the row generic, and convert here at
+ * the repository boundary. Passing a Date through is allowed because a query
+ * built with `db.select()` genuinely does return one.
+ */
+export function parseTimestamp(value: string | Date): Date {
+  if (value instanceof Date) return value;
+
+  // Postgres renders timestamptz as "2026-09-08 00:00:00.123+00" — a space
+  // instead of "T", and a two-digit offset. Neither is valid ISO 8601, so the
+  // string is normalised rather than handed to Date's lenient non-standard
+  // parser, whose behaviour is not guaranteed across engines.
+  const iso = value.replace(" ", "T").replace(/([+-]\d{2})$/, "$1:00");
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError(`Not a valid timestamp from the driver: ${String(value)}`);
+  }
+  return date;
+}
+
+/** `parseTimestamp` for a nullable column. */
+export function parseTimestampOrNull(value: string | Date | null): Date | null {
+  return value === null || value === undefined ? null : parseTimestamp(value);
+}

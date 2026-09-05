@@ -257,8 +257,24 @@ interface NotificationChannel {
 | Secrets | Cloud secrets manager, injected at runtime — never in the image, never in git |
 | CI/CD | typecheck → lint → unit → integration → build → e2e → dependency audit → migrate → deploy |
 | Migrations | Forward-only SQL, run as a separate step before the new app version starts |
+| Database roles | Migrations run as the **owner**; the application connects as **`hdr_app`**, which cannot create or drop objects and cannot `UPDATE`/`DELETE` the append-only tables |
 
 `docker-compose.yml` provides Postgres for local development only. It is not a production deployment.
+
+### Two database roles, not one
+
+The deploy runs migrations as the owner and then `npm run db:grant`, which applies `db/roles/grant-app-role.sql`. The application's own `DATABASE_URL` points at `hdr_app`.
+
+The grant script is part of the deploy, not a one-off, because it grants on the tables that exist at the time it runs. There is deliberately no `ALTER DEFAULT PRIVILEGES`: a table added by a future migration should be a decision someone makes in that file, not one that happens to them — most of all a future append-only table, which would otherwise arrive writable.
+
+The role is created `NOLOGIN`. Give it a password out of band from the secrets manager (`ALTER ROLE hdr_app WITH LOGIN PASSWORD '…'`) so the credential never enters a file that lives in git.
+
+### Multi-instance requirements
+
+The table above specifies **≥2 instances**, which makes two settings mandatory rather than advisory:
+
+- **`NEXT_SERVER_ACTIONS_ENCRYPTION_KEY`** — Next.js encrypts the values captured in Server Action closures. Unset, each instance generates its own key, so a request served by a different instance than the one that rendered the page cannot decrypt the action reference and the form breaks. Set one stable base64 32-byte value (`openssl rand -base64 32`) across every instance, and keep it stable across deploys. Four modules in this codebase use Server Actions, so this is not hypothetical. Startup warns when it is unset in production.
+- **`RATE_LIMIT_BACKEND=redis`** — the in-memory limiter is per-process, so N instances multiply every limit by N. Startup warns about this too.
 
 ---
 

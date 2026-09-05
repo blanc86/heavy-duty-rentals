@@ -228,6 +228,26 @@ Every endpoint enforces, in order: schema validation → authentication → auth
 ### Audit log
 Append-only and **hash-chained**: each entry stores `previousHash` and `entryHash = SHA256(previousHash || canonicalJson(entry))`. Deleting or altering a historical row breaks the chain and is detectable by a verification job. The application role has no `UPDATE`/`DELETE` privilege on the table.
 
+#### Least-privilege application role — `hdr_app`
+
+Detection and prevention, deliberately both: the hash chain makes tampering *detectable*, and the privilege model makes it *impossible through the application*. Detection alone is weaker than prevention; prevention alone leaves no evidence if it is bypassed.
+
+Migrations run as the database owner. The application connects as `hdr_app`, provisioned by `db/roles/grant-app-role.sql` (`npm run db:grant`, run after every migration):
+
+| Capability | `hdr_app` |
+|---|---|
+| `SELECT`/`INSERT`/`UPDATE`/`DELETE` on business tables | Granted |
+| `UPDATE`/`DELETE` on `audit_log`, `booking_event`, `payment_webhook_event` | **Revoked** |
+| `INSERT` on those same tables (append) | Granted |
+| `CREATE`/`DROP` of any object | Revoked (`CREATE` revoked on schema `public`; not the owner) |
+| Granting itself more | Revoked (`NOSUPERUSER NOCREATEROLE NOINHERIT NOBYPASSRLS`) |
+
+`payment_webhook_event` is on that list for a specific reason: the unique index on `(provider, provider_event_id)` is what blocks webhook replay, so an application able to `DELETE` a processed event could replay a payment.
+
+**Verified by connecting as the role**, not by reading the grant table: `UPDATE`/`DELETE` on all three tables refused, `INSERT` into `audit_log` accepted, `DROP TABLE booking` refused ("must be owner"), `CREATE TABLE` refused ("permission denied for schema public"), ordinary business `UPDATE` accepted.
+
+Until this was provisioned, migration 0001's `REVOKE` was a **no-op** — it is wrapped in `IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hdr_app')`, and the role did not exist.
+
 Audited: login success/failure, logout, password change, MFA enrolment/removal, role change, member add/remove, equipment change, **rate change**, booking create/cancel, payment, refund, invoice issue, document access, permission change, admin action, and every `denied` authorization outcome.
 
 Each entry records actor, actor type, IP, user agent, action, resource, company, outcome, and redacted metadata.

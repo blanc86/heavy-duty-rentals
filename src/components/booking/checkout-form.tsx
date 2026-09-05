@@ -39,6 +39,9 @@ interface Quote {
     vatRatePpm: number;
     vat: string;
     deposit: string;
+    /** Subtotal + VAT. What the card is charged; excludes the deposit. */
+    chargedNow: string;
+    /** Charge + deposit. Total exposure, never presented as "due now". */
     total: string;
   };
 }
@@ -363,26 +366,39 @@ export function CheckoutForm({
                     </dd>
                   </div>
 
-                  {quote.pricing.deposit !== "0" && (
-                    <div className="flex justify-between gap-3 border-t border-dashed border-steel-300 pt-1.5">
-                      <dt className="text-steel-600">
-                        {dict.booking.depositLine}
-                        <span className="block text-xs text-steel-500">
-                          {dict.equipment.depositNote}
-                        </span>
-                      </dt>
-                      <dd className="shrink-0 font-medium text-steel-900 numeric-latin">
-                        {money(quote.pricing.deposit)}
-                      </dd>
-                    </div>
-                  )}
-
+                  {/* The charge, on its own. The deposit is deliberately BELOW
+                      this line: it is not taken today, and rolling it into the
+                      headline figure would overstate what the card is billed
+                      and disagree with the tax invoice. */}
                   <div className="flex justify-between gap-3 border-t-2 border-steel-300 pt-2">
-                    <dt className="font-bold text-steel-950">{dict.booking.totalDueNow}</dt>
+                    <dt className="font-bold text-steel-950">{dict.booking.chargedNow}</dt>
                     <dd className="shrink-0 text-lg font-bold text-steel-950 numeric-latin">
-                      {money(quote.pricing.total)}
+                      {money(quote.pricing.chargedNow)}
                     </dd>
                   </div>
+
+                  {quote.pricing.deposit !== "0" && (
+                    <>
+                      <div className="flex justify-between gap-3 border-t border-dashed border-steel-300 pt-1.5">
+                        <dt className="text-steel-600">
+                          {dict.booking.depositLine}
+                          <span className="block text-xs text-steel-500">
+                            {dict.booking.depositTiming}
+                          </span>
+                        </dt>
+                        <dd className="shrink-0 font-medium text-steel-900 numeric-latin">
+                          {money(quote.pricing.deposit)}
+                        </dd>
+                      </div>
+
+                      <div className="flex justify-between gap-3 pt-1.5 text-sm">
+                        <dt className="text-steel-600">{dict.booking.totalCommitment}</dt>
+                        <dd className="shrink-0 font-medium text-steel-900 numeric-latin">
+                          {money(quote.pricing.total)}
+                        </dd>
+                      </div>
+                    </>
+                  )}
                 </dl>
 
                 {quote.availableUnits === 0 && (

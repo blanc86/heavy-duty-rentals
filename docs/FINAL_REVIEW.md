@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Four bugs found and fixed during the build
+## 2. Eight bugs found and fixed during the build
 
-Recorded because all four were real defects, not cosmetic. Two of them would have broken every booking in production.
+Recorded because all eight were real defects, not cosmetic. Two would have broken every booking in production; four more were found by finally driving the booking form through a browser, which is exactly what that step was for.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -77,6 +77,18 @@ Recorded because all four were real defects, not cosmetic. Two of them would hav
 **Every booking would have failed.** Writing the booking integration test surfaced that `createBooking` inserted the reservation *before* the booking row it references, violating `reservation.booking_id`'s foreign key. Nothing caught it earlier because the availability tests insert reservations directly and the HTTP verification does not drive the Server Action. The insert order is now booking → reservation, both inside the same transaction so an exclusion violation still rolls the whole thing back. **This is why the booking path needed a test rather than a manual click-through.**
 
 **A lost booking race returned a 500.** Drizzle wraps driver errors and puts the original on `cause`, so `isExclusionViolation` — which checked `error.code` at the top level — never matched. The customer who lost the race for the last crane would have seen an internal error instead of "no longer available" plus alternatives, precisely under the contention where graceful handling matters most. `sqlState` now walks the cause chain (bounded against self-referential chains), with direct unit tests.
+
+### Found by the browser click-through
+
+The four above came out of tests. These four came out of driving the real form, signed in, in a browser — and none of them could have been caught by the HTTP-level verification script, which is the argument for doing both.
+
+**The account dashboard 500'd for every company customer.** `bookingCountsForActor` hand-wrote `company_id = ANY(${array}::uuid[])` in raw SQL. Drizzle expands an interpolated JS array into one bind parameter *per element*, so Postgres received a bare uuid where it expected an array literal and raised `22P02 malformed array literal`. The same file already had a correct `scopeFor()` helper using `inArray`; the fix was to use it. The lesson is narrower than "avoid raw SQL": it is that a predicate which already exists as a helper should never be re-expressed by hand.
+
+**The admin dashboard 500'd as soon as one booking existed.** Raw `db.execute` runs through the driver's `unsafe()` path, which bypasses the type parsers the query builder relies on, so a `timestamptz` column arrives as a **string** — in Postgres's own rendering (`2026-09-08 00:00:00+00`), which is not valid ISO 8601. The row generic on `db.execute<T>` is an unchecked assertion, so `start_date: Date` compiled happily and then threw `Invalid time value` inside `Intl.DateTimeFormat` the first time a booking row was rendered. Fixed with `parseTimestamp`/`parseTimestampOrNull` at the repository boundary, the row generics corrected to `string` so the compiler now catches this class of mistake, and six unit tests covering microsecond truncation and non-UTC offsets. **Every seeded page rendered fine because there were zero bookings; the bug needed real data to appear.**
+
+**The checkout overstated what the card is charged.** The summary labelled `subtotal + VAT + deposit` as "Total due now" — SAR 30,977 — while the payment provider was correctly charging only `subtotal + VAT`, SAR 22,977, and the tax invoice correctly showed 22,977. Three surfaces, two different numbers, and the most prominent one was wrong by the deposit. The pricing engine now returns `chargedNowHalalas` as the single authority on what is billed, the deposit is presented below it as authorised at handover, and a third line gives total exposure. Locked in by unit tests and by two assertions in `verify-flow`.
+
+**Switching language mid-checkout discarded the configuration.** The language switch built its href from the pathname only, so `/en/book/x?start=…&end=…&branch=…&delivery=1&km=40` became `/ar/book/x` — dates, branch and transport gone, on the page where an Arabic-speaking customer is most likely to switch. The query string is now carried separately from the canonical pathname, so the switch preserves it while hreflang and canonical URLs stay query-free.
 
 ---
 
@@ -181,15 +193,18 @@ Verified live, not merely asserted: CSP with per-request nonce · `frame-ancesto
 
 ## 9. Recommended next steps
 
+**Done since the first review**
+- ~~Click through the booking form once in a browser.~~ Done, signed in, end to end: configure → checkout → hosted payment → signed webhook → `confirmed` → tax invoice. It found four real bugs, all fixed and listed in §2.
+- ~~Provision the least-privilege `hdr_app` database role.~~ Done: `db/roles/grant-app-role.sql`, run by `npm run db:grant`. Verified by connecting **as** the role: `UPDATE`/`DELETE` on `audit_log`, `booking_event` and `payment_webhook_event` are all refused, `INSERT` still works, `DROP TABLE` and `CREATE TABLE` are refused, ordinary business DML works. Migration 0001's revocation is no longer a no-op.
+
 **Before anything else (week 1)**
-1. Click through the booking form once in a browser — the service beneath it is tested, the form wrapper is not.
-2. Provision the least-privilege `hdr_app` database role.
-3. Replace demo company details, then replace demo inventory with the real fleet.
-4. Replace the demo testimonials and reference projects with real, consented ones — and record the consent, because the database will not publish them otherwise.
-5. Commission real equipment photography (see "Imagery" above).
+1. Replace demo company details, then replace demo inventory with the real fleet.
+2. Replace the demo testimonials and reference projects with real, consented ones — and record the consent, because the database will not publish them otherwise.
+3. Commission real equipment photography (see "Imagery" above).
+4. Decide where the refundable deposit is actually taken (see below). The UI now says "authorised at handover" — that has to be true operationally, or the wording changes.
 
 **Before launch**
-5. Contract a PSP; wire and sandbox-test the real adapter, including the deposit-hold question.
+5. Contract a PSP; wire and sandbox-test the real adapter, **including the deposit hold**. This is the one place where the code deliberately stops short of what the interface allows: `PaymentProvider` supports `mode: "authorize"`, `capture()` and `void()`, but `startPayment` creates only the `rental_charge` intent. A hosted-page PSP can redirect the customer once per checkout, and authorising the deposit afterwards needs a stored card token — which needs tokenisation on a contract that does not exist yet. So the deposit is presented as authorised at handover and is not charged online. It is not faked: nothing claims to have collected it, the invoice states it is held separately and carries no VAT, and the charged figure excludes it.
 6. Engage a tax advisor on ZATCA; implement clearance.
 7. Have Saudi counsel review every legal page.
 8. Commission an independent penetration test.

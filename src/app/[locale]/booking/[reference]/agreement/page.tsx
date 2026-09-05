@@ -205,13 +205,14 @@ export default async function AgreementPage({
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide text-steel-500">
-                {dict.booking.totalDueNow}
+                {dict.booking.chargedNow}
               </dt>
               <dd className="font-medium text-steel-900 numeric-latin">
-                {money(booking.totalHalalas)}
+                {money(booking.taxableSubtotalHalalas + booking.vatHalalas)}
                 {booking.depositHalalas > 0n && (
                   <span className="block text-xs font-normal text-steel-500">
-                    {dict.booking.depositLine}: {money(booking.depositHalalas)}
+                    {dict.booking.depositLine}: {money(booking.depositHalalas)} —{" "}
+                    {dict.booking.depositTiming}
                   </span>
                 )}
               </dd>

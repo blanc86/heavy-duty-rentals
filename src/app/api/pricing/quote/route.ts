@@ -113,6 +113,7 @@ export async function POST(request: Request) {
             vatRatePpm: pricing.vatRatePpm,
             vat: serializeHalalas(pricing.vatHalalas),
             deposit: serializeHalalas(pricing.depositHalalas),
+            chargedNow: serializeHalalas(pricing.chargedNowHalalas),
             total: serializeHalalas(pricing.totalHalalas),
           },
         };

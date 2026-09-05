@@ -12,14 +12,29 @@ import type { PaymentIntent, VerifiedWebhookEvent } from "./types";
 /**
  * Start payment for a booking.
  *
- * Two SEPARATE intents are created when a deposit applies:
- *   - `rental_charge`          — money that is actually taken
- *   - `deposit_authorization`  — a hold, released or partly captured on return
+ * Creates exactly ONE intent at checkout: `rental_charge`, for
+ * `taxableSubtotal + VAT`. The refundable deposit is NOT charged here and NOT
+ * added to this amount.
  *
- * Never one combined charge. A refundable deposit is not revenue, is outside
- * the VAT base, and must be visibly distinct to the customer. Merging them is
- * both a tax error and the single thing most likely to make a customer
- * distrust the checkout.
+ * Why the deposit is not taken at checkout
+ * ----------------------------------------
+ * A deposit must be an authorization (a hold that is voided on clean return),
+ * never a charge — it is not revenue and is outside the VAT base, so merging
+ * it into the rental charge is a tax error as well as a trust one.
+ *
+ * But a hosted-page PSP can only redirect the customer to ONE page per
+ * checkout, and an authorization against the same card afterwards needs a
+ * stored card token, which requires tokenization to be enabled on a PSP
+ * contract the business has not signed yet (docs/research.md §5).
+ *
+ * So the deposit is authorized at HANDOVER instead, on the depot terminal,
+ * using `provider.createIntent({ mode: "authorize" })` and released with
+ * `provider.void()` after the return inspection. That path is deliberately not
+ * wired up here: it needs a settled PSP contract and the depot flow. Until it
+ * is, the deposit is presented to the customer as authorised at handover — it
+ * is never described as due now, and never included in the charged figure.
+ *
+ * See docs/FINAL_REVIEW.md — deposit authorization.
  */
 export async function startPayment(params: {
   bookingId: string;

@@ -111,6 +111,11 @@ export function proxy(request: NextRequest): NextResponse {
   // The pathname is not otherwise available to a Server Component, and layouts
   // need it to build the hreflang alternate for the other locale.
   requestHeaders.set("x-pathname", pathname);
+  // The query string is carried SEPARATELY and deliberately: hreflang and
+  // canonical URLs must stay query-free, but the user-facing language switch
+  // has to preserve it, or switching to Arabic mid-checkout silently discards
+  // the dates, branch and transport the customer just configured.
+  requestHeaders.set("x-search", request.nextUrl.search);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);

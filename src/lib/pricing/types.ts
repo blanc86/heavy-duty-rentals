@@ -119,7 +119,20 @@ export interface PricingResult {
   /** Refundable. Outside the tax base and outside revenue. */
   depositHalalas: Halalas;
 
-  /** taxableSubtotal + VAT + deposit. What the customer pays today. */
+  /**
+   * taxableSubtotal + VAT. The amount the CARD IS ACTUALLY CHARGED at
+   * checkout, and the amount that appears on the tax invoice.
+   *
+   * The deposit is deliberately excluded: it is a refundable hold taken at
+   * handover, not money collected today (see `startPayment`). Presenting the
+   * deposit as due now would overstate the checkout charge by the deposit.
+   */
+  chargedNowHalalas: Halalas;
+
+  /**
+   * taxableSubtotal + VAT + deposit. The customer's TOTAL EXPOSURE across the
+   * hire, not a single payment. Never label this "due now".
+   */
   totalHalalas: Halalas;
 }
 

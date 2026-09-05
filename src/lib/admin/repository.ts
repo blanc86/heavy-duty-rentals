@@ -1,5 +1,5 @@
 import { sql as raw } from "drizzle-orm";
-import { db } from "@/lib/db";
+import { db, parseTimestamp, parseTimestampOrNull } from "@/lib/db";
 import type { Locale } from "@/lib/i18n/config";
 import type { Halalas } from "@/lib/money";
 
@@ -273,13 +273,14 @@ export async function listAdminBookings(params: {
     company_name: string | null;
     class_name: string | null;
     asset_code: string | null;
-    start_date: Date;
-    end_date: Date;
+    // Strings, not Dates: raw `db.execute` bypasses the driver's type parsers.
+    start_date: string;
+    end_date: string;
     site_city: string | null;
     total_halalas: string;
     currency: string;
     payment_status: string | null;
-    created_at: Date;
+    created_at: string;
   }>(raw`
     SELECT b.id, b.reference, b.status,
            u.full_name AS customer_name,
@@ -319,13 +320,13 @@ export async function listAdminBookings(params: {
     companyName: r.company_name,
     className: r.class_name ?? "—",
     assetCode: r.asset_code,
-    startDate: r.start_date,
-    endDate: r.end_date,
+    startDate: parseTimestamp(r.start_date),
+    endDate: parseTimestamp(r.end_date),
     siteCity: r.site_city,
     totalHalalas: BigInt(r.total_halalas),
     currency: r.currency,
     paymentStatus: r.payment_status,
-    createdAt: r.created_at,
+    createdAt: parseTimestamp(r.created_at),
   }));
 }
 
@@ -359,7 +360,7 @@ export async function listAdminUnits(params: {
     status: string;
     engine_hours: number;
     year_of_manufacture: number | null;
-    next_inspection_due_at: Date | null;
+    next_inspection_due_at: string | null;
     current_booking_reference: string | null;
   }>(raw`
     SELECT u.id, u.asset_code, u.serial_number,
@@ -390,7 +391,7 @@ export async function listAdminUnits(params: {
     status: r.status,
     engineHours: Number(r.engine_hours),
     yearOfManufacture: r.year_of_manufacture,
-    nextInspectionDueAt: r.next_inspection_due_at,
+    nextInspectionDueAt: parseTimestampOrNull(r.next_inspection_due_at),
     currentBookingReference: r.current_booking_reference,
   }));
 }
@@ -399,7 +400,7 @@ export async function listAdminUnits(params: {
 export async function listAuditEntries(limit = 100) {
   const rows = await db.execute<{
     id: string;
-    occurred_at: Date;
+    occurred_at: string;
     action: string;
     outcome: string;
     actor_type: string;

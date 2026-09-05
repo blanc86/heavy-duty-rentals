@@ -233,6 +233,12 @@ export const en = {
     subtotal: "Subtotal",
     vat: "VAT ({rate}%)",
     depositLine: "Refundable deposit",
+    /** Charged to the card at checkout: subtotal + VAT, deposit excluded. */
+    chargedNow: "Charged now",
+    /** Why the deposit is not in the "charged now" figure. */
+    depositTiming: "Authorised at handover, not charged today. Released after the return inspection.",
+    /** Charge + deposit. The customer's total exposure, not one payment. */
+    totalCommitment: "Total including deposit",
     totalDueNow: "Total due now",
     termsTitle: "Rental agreement",
     termsIntro: "Please read and accept the rental terms before continuing.",

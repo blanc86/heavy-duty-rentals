@@ -124,6 +124,19 @@ export function assertProductionReady(): void {
     );
   }
 
+  // Read straight from process.env: this one is consumed by Next.js itself,
+  // not by our schema. Same shape of hazard as the rate limiter above — fine
+  // on a single instance, broken across several, and silent either way.
+  if (!process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY) {
+    console.warn(
+      "[startup] NEXT_SERVER_ACTIONS_ENCRYPTION_KEY is unset, so Next.js generates " +
+        "a per-instance key for Server Action closure encryption. With more than " +
+        "one instance, a request served by a different instance than the one that " +
+        "rendered the page fails to decrypt the action reference and the form " +
+        "breaks. Set it to a stable base64 32-byte value across all instances.",
+    );
+  }
+
   if (failures.length > 0) {
     throw new Error(
       ["Refusing to start in production:", ...failures.map((f) => `  - ${f}`)].join("\n"),

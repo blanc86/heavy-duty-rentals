@@ -215,14 +215,16 @@ export async function getBookingForActor(
 
 /** Counts for the customer dashboard. */
 export async function bookingCountsForActor(actor: AuthenticatedActor) {
-  const companyIds = accessibleCompanyIds(actor);
-  const rows = await db.execute<{ status: string; count: number }>(raw`
-    SELECT status, COUNT(*)::int AS count
-    FROM booking
-    WHERE customer_user_id = ${actor.userId}
-      ${companyIds.length > 0 ? raw`OR company_id = ANY(${companyIds}::uuid[])` : raw``}
-    GROUP BY status
-  `);
+  // Uses the same `scopeFor` predicate as every other read in this file.
+  // A hand-written `= ANY(${array}::uuid[])` does NOT work here: drizzle
+  // expands an interpolated JS array into one bind parameter per element, so
+  // Postgres receives a bare uuid where it expects an array literal and fails
+  // with 22P02. `inArray` builds the correct form.
+  const rows = await db
+    .select({ status: bookings.status, count: raw<number>`count(*)::int` })
+    .from(bookings)
+    .where(scopeFor(actor))
+    .groupBy(bookings.status);
 
   const counts: Record<string, number> = {};
   for (const row of rows) counts[row.status] = Number(row.count);

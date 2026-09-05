@@ -399,6 +399,26 @@ describe("deposit", () => {
     expect(result.totalHalalas).toBe(sar(1000) + sar(150) + sar(5000));
   });
 
+  it("excludes the deposit from the amount charged at checkout", () => {
+    const result = calculatePrice(baseInput({ billableDays: 1, depositHalalas: sar(5000) }));
+
+    // What the card is billed: rental + VAT only. A deposit is a hold taken at
+    // handover, so folding it in here would overstate the charge and disagree
+    // with the tax invoice, which is built from the same two figures.
+    expect(result.chargedNowHalalas).toBe(sar(1000) + sar(150));
+    expect(result.chargedNowHalalas).toBe(
+      result.taxableSubtotalHalalas + result.vatHalalas,
+    );
+
+    // And the deposit is still accounted for — as exposure, not as a charge.
+    expect(result.totalHalalas - result.chargedNowHalalas).toBe(result.depositHalalas);
+  });
+
+  it("charges the full total when no deposit applies", () => {
+    const result = calculatePrice(baseInput({ depositHalalas: 0n }));
+    expect(result.chargedNowHalalas).toBe(result.totalHalalas);
+  });
+
   it("marks the deposit line as non-taxable", () => {
     const result = calculatePrice(baseInput({ depositHalalas: sar(5000) }));
     const depositLine = result.lines.find((l) => l.kind === "deposit");
@@ -541,5 +561,9 @@ describe("realistic end-to-end scenario", () => {
     expect(result.totalHalalas).toBe(
       result.taxableSubtotalHalalas + result.vatHalalas + result.depositHalalas,
     );
+
+    // ...and the charged figure is that total less the refundable deposit.
+    expect(result.chargedNowHalalas).toBe(sar(83_329));
+    expect(result.chargedNowHalalas).toBe(result.totalHalalas - result.depositHalalas);
   });
 });

@@ -172,6 +172,21 @@ async function main() {
           BigInt(quote.pricing.vat) +
           BigInt(quote.pricing.deposit),
     );
+
+    // The amount the card is actually charged must exclude the refundable
+    // deposit, or the checkout overstates the charge and disagrees with the
+    // tax invoice built from the same two figures.
+    check(
+      "charged-now excludes the refundable deposit",
+      BigInt(quote.pricing.chargedNow) ===
+        BigInt(quote.pricing.taxableSubtotal) + BigInt(quote.pricing.vat),
+      `chargedNow=${quote.pricing.chargedNow} total=${quote.pricing.total} deposit=${quote.pricing.deposit}`,
+    );
+    check(
+      "charged-now is strictly less than total when a deposit applies",
+      BigInt(quote.pricing.deposit) === 0n ||
+        BigInt(quote.pricing.chargedNow) < BigInt(quote.pricing.total),
+    );
   } else {
     check("pricing API returned a breakdown", false, JSON.stringify(quote).slice(0, 200));
   }

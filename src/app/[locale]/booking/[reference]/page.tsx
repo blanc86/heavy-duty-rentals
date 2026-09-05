@@ -277,28 +277,40 @@ export default async function BookingDetailPage({
                     </td>
                   </tr>
 
-                  {booking.depositHalalas > 0n && (
-                    <tr className="border-b border-dashed border-steel-300">
-                      <th scope="row" className="py-2 text-start font-normal text-steel-600">
-                        {dict.booking.depositLine}
-                        <span className="block text-xs text-steel-500">
-                          {dict.equipment.depositNote}
-                        </span>
-                      </th>
-                      <td className="py-2 text-end font-medium text-steel-900 numeric-latin">
-                        {money(booking.depositHalalas)}
-                      </td>
-                    </tr>
-                  )}
-
+                  {/* Charged amount first and alone; the deposit is not part
+                      of it. This figure must equal the tax invoice total. */}
                   <tr>
                     <th scope="row" className="pt-3 text-start text-base font-bold text-steel-950">
-                      {dict.booking.totalDueNow}
+                      {dict.booking.chargedNow}
                     </th>
                     <td className="pt-3 text-end text-lg font-bold text-steel-950 numeric-latin">
-                      {money(booking.totalHalalas)}
+                      {money(booking.taxableSubtotalHalalas + booking.vatHalalas)}
                     </td>
                   </tr>
+
+                  {booking.depositHalalas > 0n && (
+                    <>
+                      <tr className="border-t border-dashed border-steel-300">
+                        <th scope="row" className="py-2 text-start font-normal text-steel-600">
+                          {dict.booking.depositLine}
+                          <span className="block text-xs text-steel-500">
+                            {dict.booking.depositTiming}
+                          </span>
+                        </th>
+                        <td className="py-2 text-end font-medium text-steel-900 numeric-latin">
+                          {money(booking.depositHalalas)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th scope="row" className="py-1 text-start font-normal text-steel-600">
+                          {dict.booking.totalCommitment}
+                        </th>
+                        <td className="py-1 text-end font-medium text-steel-900 numeric-latin">
+                          {money(booking.totalHalalas)}
+                        </td>
+                      </tr>
+                    </>
+                  )}
                 </tbody>
               </table>
             </ScrollX>

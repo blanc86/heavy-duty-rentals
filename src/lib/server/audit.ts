@@ -150,7 +150,11 @@ export async function verifyAuditChain(limit = 10_000): Promise<{
 }> {
   const rows = await db.execute<{
     id: string;
-    occurred_at: Date;
+    // A string, not a Date: raw `db.execute` bypasses the driver's type
+    // parsers. `new Date(...)` below normalises it, and the millisecond
+    // truncation is deliberate — the hash was computed from a JS Date at write
+    // time, so verification must reproduce exactly that precision.
+    occurred_at: string;
     actor_user_id: string | null;
     actor_type: string;
     action: string;

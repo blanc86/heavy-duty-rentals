@@ -78,6 +78,8 @@ export default async function LocaleLayout({
   ]);
 
   const pathname = requestHeaders.get("x-pathname") ?? `/${locale}`;
+  // Only the language switch uses this — never the canonical/hreflang tags.
+  const search = requestHeaders.get("x-search") ?? "";
 
   return (
     // `lang` and `dir` are set here, on the server, in the first bytes of HTML.
@@ -97,7 +99,7 @@ export default async function LocaleLayout({
           </div>
         )}
 
-        <SiteHeader locale={locale} dict={dict} actor={actor} pathname={pathname} />
+        <SiteHeader locale={locale} dict={dict} actor={actor} pathname={pathname} search={search} />
 
         <main id="main" className="flex-1">
           {children}
