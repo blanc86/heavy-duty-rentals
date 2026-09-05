@@ -161,8 +161,18 @@ export default async function AdminBookingsPage({
                       </Badge>
                     </td>
                     <td className="px-4 py-2.5 text-steel-700">{b.paymentStatus ?? "—"}</td>
+                    {/* The CHARGED amount, so this column reconciles against
+                        the revenue tile and the tax invoice. The deposit is
+                        shown beneath it rather than folded in, because it is
+                        not collected online. */}
                     <td className="px-4 py-2.5 text-end font-medium text-steel-950 numeric-latin">
-                      {formatMoney(b.totalHalalas, locale, b.currency)}
+                      {formatMoney(b.chargedNowHalalas, locale, b.currency)}
+                      {b.depositHalalas > 0n && (
+                        <span className="block text-xs font-normal text-steel-500">
+                          + {formatMoney(b.depositHalalas, locale, b.currency)}{" "}
+                          {dict.booking.depositLine.toLowerCase()}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -200,8 +200,10 @@ export default async function AdminDashboardPage({
                           {booking.status.replace(/_/g, " ")}
                         </Badge>
                       </td>
+                      {/* Charged, not total-with-deposit: this sits next to the
+                          revenue tile and must agree with it. */}
                       <td className="px-4 py-2.5 text-end font-medium text-steel-950 numeric-latin">
-                        {formatMoney(booking.totalHalalas, locale, booking.currency)}
+                        {formatMoney(booking.chargedNowHalalas, locale, booking.currency)}
                       </td>
                     </tr>
                   ))

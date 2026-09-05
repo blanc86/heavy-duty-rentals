@@ -251,6 +251,13 @@ export interface AdminBookingRow {
   startDate: Date;
   endDate: Date;
   siteCity: string | null;
+  /**
+   * subtotal + VAT: what the card was charged and what the tax invoice shows.
+   * This is the figure that reconciles against the revenue tile; `totalHalalas`
+   * does not, because it includes a deposit that is never collected online.
+   */
+  chargedNowHalalas: Halalas;
+  depositHalalas: Halalas;
   totalHalalas: Halalas;
   currency: string;
   paymentStatus: string | null;
@@ -277,6 +284,8 @@ export async function listAdminBookings(params: {
     start_date: string;
     end_date: string;
     site_city: string | null;
+    charged_now_halalas: string;
+    deposit_halalas: string;
     total_halalas: string;
     currency: string;
     payment_status: string | null;
@@ -288,6 +297,8 @@ export async function listAdminBookings(params: {
            ec.${raw.raw(locale === "ar" ? "name_ar" : "name_en")} AS class_name,
            eu.asset_code,
            b.start_date, b.end_date, b.site_city,
+           (b.taxable_subtotal_halalas + b.vat_halalas)::text AS charged_now_halalas,
+           b.deposit_halalas::text AS deposit_halalas,
            b.total_halalas::text AS total_halalas, b.currency,
            (SELECT p.status FROM payment p
              WHERE p.booking_id = b.id AND p.kind = 'rental_charge'
@@ -323,6 +334,8 @@ export async function listAdminBookings(params: {
     startDate: parseTimestamp(r.start_date),
     endDate: parseTimestamp(r.end_date),
     siteCity: r.site_city,
+    chargedNowHalalas: BigInt(r.charged_now_halalas),
+    depositHalalas: BigInt(r.deposit_halalas),
     totalHalalas: BigInt(r.total_halalas),
     currency: r.currency,
     paymentStatus: r.payment_status,
