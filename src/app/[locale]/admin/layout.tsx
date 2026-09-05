@@ -51,6 +51,7 @@ export default async function AdminLayout({
   const nav = [
     { href: "/admin", label: dict.admin.dashboard },
     { href: "/admin/bookings", label: dict.admin.bookings },
+    { href: "/admin/quotes", label: dict.admin.quotes },
     { href: "/admin/inventory", label: dict.admin.inventory },
     { href: "/admin/utilization", label: dict.admin.utilization },
     { href: "/admin/audit", label: dict.admin.auditLog },

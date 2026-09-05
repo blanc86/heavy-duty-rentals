@@ -431,3 +431,105 @@ export async function listAuditEntries(limit = 100) {
   `);
   return rows;
 }
+
+export interface AdminQuoteRow {
+  id: string;
+  reference: string;
+  status: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  companyName: string | null;
+  className: string | null;
+  descriptionRaw: string | null;
+  siteCity: string | null;
+  startDate: Date | null;
+  endDate: Date | null;
+  liftDetails: Record<string, unknown>;
+  createdAt: Date;
+}
+
+/**
+ * Quote requests, newest first.
+ *
+ * The public form tells the customer "we will come back with an itemised
+ * quote". Until this existed there was no screen anywhere that showed a
+ * submitted request, so that promise had nowhere to be kept: rows landed in the
+ * database and no one saw them.
+ *
+ * Read-only on purpose. Pricing a 600-tonne lift is not a form-fill — it needs
+ * a route survey and a lifting engineer — so this surfaces the request and the
+ * contact details rather than pretending a quote can be issued from a table.
+ * The response workflow is still to build (docs/FINAL_REVIEW.md §9).
+ */
+export async function listAdminQuotes(params: {
+  locale: Locale;
+  status?: string | undefined;
+  limit?: number;
+}): Promise<AdminQuoteRow[]> {
+  const { locale, status, limit = 100 } = params;
+
+  const rows = await db.execute<{
+    id: string;
+    reference: string;
+    status: string;
+    contact_name: string;
+    contact_email: string;
+    contact_phone: string;
+    company_name: string | null;
+    class_name: string | null;
+    description_raw: string | null;
+    site_city: string | null;
+    // Strings, not Dates: raw `db.execute` bypasses the driver's type parsers.
+    start_date: string | null;
+    end_date: string | null;
+    lift_details: unknown;
+    created_at: string;
+  }>(raw`
+    SELECT q.id, q.reference, q.status,
+           q.contact_name, q.contact_email, q.contact_phone,
+           COALESCE(c.name_en, q.company_name_raw) AS company_name,
+           qi.class_name,
+           qi.description_raw,
+           q.site_city,
+           q.start_date, q.end_date, q.lift_details, q.created_at
+    FROM quote q
+    LEFT JOIN company c ON c.id = q.company_id
+    -- The requested machine lives on the FIRST quote_item, not on the quote:
+    -- a request can name several. A LATERAL keeps that to one row per quote
+    -- instead of multiplying the list by its own line items.
+    LEFT JOIN LATERAL (
+      SELECT ec.${raw.raw(locale === "ar" ? "name_ar" : "name_en")} AS class_name,
+             qi.description_raw
+      FROM quote_item qi
+      LEFT JOIN equipment_class ec ON ec.id = qi.class_id
+      WHERE qi.quote_id = q.id
+      ORDER BY qi.sort_order
+      LIMIT 1
+    ) qi ON TRUE
+    WHERE TRUE
+      ${status ? raw`AND q.status = ${status}::quote_status` : raw``}
+    ORDER BY q.created_at DESC
+    LIMIT ${limit}
+  `);
+
+  return rows.map((r) => ({
+    id: r.id,
+    reference: r.reference,
+    status: r.status,
+    contactName: r.contact_name,
+    contactEmail: r.contact_email,
+    contactPhone: r.contact_phone,
+    companyName: r.company_name,
+    className: r.class_name,
+    descriptionRaw: r.description_raw,
+    siteCity: r.site_city,
+    startDate: parseTimestampOrNull(r.start_date),
+    endDate: parseTimestampOrNull(r.end_date),
+    liftDetails:
+      typeof r.lift_details === "string"
+        ? (JSON.parse(r.lift_details) as Record<string, unknown>)
+        : ((r.lift_details ?? {}) as Record<string, unknown>),
+    createdAt: parseTimestamp(r.created_at),
+  }));
+}

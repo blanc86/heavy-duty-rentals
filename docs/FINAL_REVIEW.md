@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Eight bugs found and fixed during the build
+## 2. Twelve bugs found and fixed during the build
 
-Recorded because all eight were real defects, not cosmetic. Two would have broken every booking in production; four more were found by finally driving the booking form through a browser, which is exactly what that step was for.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four more from sweeping every route and every remaining form.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -89,6 +89,18 @@ The four above came out of tests. These four came out of driving the real form, 
 **The checkout overstated what the card is charged.** The summary labelled `subtotal + VAT + deposit` as "Total due now" — SAR 30,977 — while the payment provider was correctly charging only `subtotal + VAT`, SAR 22,977, and the tax invoice correctly showed 22,977. Three surfaces, two different numbers, and the most prominent one was wrong by the deposit. The pricing engine now returns `chargedNowHalalas` as the single authority on what is billed, the deposit is presented below it as authorised at handover, and a third line gives total exposure. Locked in by unit tests and by two assertions in `verify-flow`.
 
 **Switching language mid-checkout discarded the configuration.** The language switch built its href from the pathname only, so `/en/book/x?start=…&end=…&branch=…&delivery=1&km=40` became `/ar/book/x` — dates, branch and transport gone, on the page where an Arabic-speaking customer is most likely to switch. The query string is now carried separately from the canonical pathname, so the switch preserves it while hreflang and canonical URLs stay query-free.
+
+### Found by sweeping every route and every remaining form
+
+Driving one form found four bugs, so the rest of the application got the same treatment: `npm run verify:routes` requests every page in both locales — anonymously, as an admin, and as the customer who owns a booking — and each remaining form was submitted by hand.
+
+**Nobody could sign out.** `logoutAction` was written, `dict.nav.logout` was translated into both languages, `revokeAllSessions` existed — and no component rendered a control, so there was no way to leave an account. Sessions last thirty days and this is used from shared site-office and depot machines. Added a sign-out form (a POST, not a link: a GET that destroys a session can be fired by a prefetch or an image tag) to the header, the mobile drawer and the account page.
+
+**Every registration produced an account nobody could use.** `registerAction` created the user with status `pending_verification`; `resolveSession` grants no actor to a non-active user. So a new customer received a valid session, was redirected to `/account`, was bounced back to sign-in, and looped. Signing in again did not help — login only rejects `suspended`, so it issued another session that also resolved to nothing. There was no escape, because no email verification exists anywhere: `auth_token` is never written to, and there is no mail transport at all. Nothing failed loudly — the row was written, the audit said success, the redirect looked deliberate, every route returned its expected status. The only symptom was a customer who could never get in. Registration now creates the account `active` with `email_verified_at` left null, which is the truth: the account works, the address is unproven. Three integration tests pin the invariant that was violated.
+
+**All three Arabic guides had never been reachable.** Next.js hands dynamic segments to the page **percent-encoded**, not decoded. ASCII kebab-case slugs encode to themselves, so this is invisible until a slug is non-ASCII — and article slugs are translated rather than transliterated, which is correct for SEO and fatal here. Every Arabic guide arrived as `%D9%85%D8%A7-…`, matched nothing, and 404'd, while the guides index linked to them happily. Fixed with `decodeSlugParam`. Separately, the language switch built `/ar/guides/<english-slug>`, which matches no article; the route now resolves a foreign-locale slug through the translation group and redirects to its counterpart.
+
+**The admin console repeated the checkout's money error.** The dashboard showed "Revenue (30d) SAR 22,977" beside a booking "Total SAR 30,977" — a reconciliation trap, since the deposit in that total is never collected online. Both admin tables now show the charged amount, which agrees with the revenue tile and the tax invoice, with the deposit listed beneath rather than folded in.
 
 ---
 
@@ -213,7 +225,7 @@ Verified live, not merely asserted: CSP with per-request nonce · `frame-ancesto
 
 **First quarter after launch**
 11. Delivery dispatch and digital inspections (the biggest operational gaps).
-12. Quotes admin — the quote request exists but has no admin response flow.
+12. Quote **response** flow. The request form and a read-only `/admin/quotes` list now exist — until that list was added, requests landed in the database and no screen showed them, so the form's promise of "we will come back with an itemised quote" had nowhere to be kept. Pricing and sending a quote is still to build; above the instant-book threshold it needs a route survey and a lifting engineer, so it is a workflow, not a form.
 13. Reviews tied to completed rentals.
 14. Notification providers.
 15. CSV exports.

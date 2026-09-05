@@ -142,6 +142,7 @@ async function main() {
     "/admin",
     "/admin/audit",
     "/admin/bookings",
+    "/admin/quotes",
     "/admin/inventory",
     "/admin/utilization",
   ];

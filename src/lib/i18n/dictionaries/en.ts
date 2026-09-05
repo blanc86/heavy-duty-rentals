@@ -344,6 +344,8 @@ export const en = {
     availableUnits: "Available units",
     totalUnits: "Total units",
     newBookings: "New bookings",
+    quotesReadOnlyNote:
+      "Read-only. Requests above the instant-book capacity threshold need a route survey and a lifting engineer before they can be priced, so the response happens by phone until the quoting workflow is built.",
     conversionRate: "Conversion rate",
   },
 
