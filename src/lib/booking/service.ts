@@ -6,7 +6,7 @@ import type { TstzRange } from "@/lib/db/schema/types";
 import { env } from "@/lib/env";
 import { generateReference, uuidv7 } from "@/lib/ids";
 import type { Halalas } from "@/lib/money";
-import { occupiedPeriod, UnitNoLongerAvailableError } from "@/lib/availability";
+import { expireStaleHolds, occupiedPeriod, UnitNoLongerAvailableError } from "@/lib/availability";
 import { quote, toPricingSnapshot, type QuoteRequest } from "@/lib/pricing/repository";
 import { writeAudit } from "@/lib/server/audit";
 
@@ -484,3 +484,53 @@ export async function transitionBooking(params: {
 
 /** Checkout hold lifetime, in minutes. Configurable per deployment. */
 export const CHECKOUT_HOLD_MINUTES = env.CHECKOUT_HOLD_MINUTES;
+
+/**
+ * Expire abandoned checkouts: release the machine AND close the booking.
+ *
+ * `expireStaleHolds` frees the machine, which is the part that matters for
+ * inventory. It leaves the booking itself in `pending_payment` for ever, so
+ * abandoned checkouts pile up in the operations dashboard's "Awaiting payment"
+ * tile with money attached to them — a number that only ever grows and that
+ * nobody can act on.
+ *
+ * `expired` has been in `booking_status` from the start and nothing ever
+ * reached it. This is what it was for.
+ *
+ * Deliberately NOT one transaction with the hold release: freeing the machine
+ * is urgent and must not be held up or rolled back by bookkeeping on the
+ * booking row. Each transition is a compare-and-set, so a booking that was
+ * paid in the meantime is left alone.
+ */
+export async function expireAbandonedCheckouts(): Promise<{
+  holdsReleased: number;
+  bookingsExpired: number;
+}> {
+  const holdsReleased = await expireStaleHolds();
+
+  // Only bookings whose hold has actually lapsed and which nobody has paid.
+  // A `confirmed` reservation has a null expiry and cannot appear here.
+  const stale = await db.execute<{ booking_id: string }>(raw`
+    SELECT DISTINCT r.booking_id
+    FROM reservation r
+    JOIN booking b ON b.id = r.booking_id
+    WHERE r.status = 'expired'
+      AND b.status = 'pending_payment'
+      AND r.booking_id IS NOT NULL
+  `);
+
+  let bookingsExpired = 0;
+  for (const row of stale) {
+    const moved = await transitionBooking({
+      bookingId: row.booking_id,
+      toStatus: "expired",
+      expectedFrom: ["pending_payment"],
+      actorType: "system",
+      type: "booking.checkout_expired",
+      metadata: { reason: "hold_lapsed_without_payment" },
+    });
+    if (moved) bookingsExpired += 1;
+  }
+
+  return { holdsReleased, bookingsExpired };
+}

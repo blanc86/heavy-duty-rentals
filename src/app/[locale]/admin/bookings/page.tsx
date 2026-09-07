@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge, Card, Input, ScrollX, Select } from "@/components/ui";
+import { AdminBookingControls } from "@/components/admin/booking-controls";
 import { listAdminBookings } from "@/lib/admin/repository";
 import { getDictionary } from "@/lib/i18n";
 import { formatDate, isLocale, localePath, type Locale } from "@/lib/i18n/config";
@@ -107,7 +108,10 @@ export default async function AdminBookingsPage({
                 <th scope="col" className="px-4 py-2.5 text-end font-semibold text-steel-700">
                   {dict.common.total}
                 </th>
-              </tr>
+                <th scope="col" className="px-4 py-2.5 text-start">
+                    {dict.admin.actions}
+                  </th>
+                </tr>
             </thead>
             <tbody>
               {bookings.length === 0 ? (
@@ -173,6 +177,10 @@ export default async function AdminBookingsPage({
                           {dict.booking.depositLine.toLowerCase()}
                         </span>
                       )}
+                    </td>
+
+                    <td className="px-4 py-2.5">
+                      <AdminBookingControls reference={b.reference} status={b.status} dict={dict} />
                     </td>
                   </tr>
                 ))

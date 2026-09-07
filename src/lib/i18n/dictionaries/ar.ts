@@ -372,6 +372,12 @@ export const ar: Dictionary = {
     newBookings: "حجوزات جديدة",
     quotesReadOnlyNote:
       "للعرض فقط. الطلبات التي تتجاوز حد الحجز الفوري تحتاج إلى معاينة للطريق ومهندس رفع قبل تسعيرها، لذا يتم الرد هاتفياً حتى يتم بناء مسار التسعير.",
+    markOnHire: "تسليم المعدة",
+    markReturned: "تسجيل الإرجاع",
+    cancelBooking: "إلغاء",
+    cancelConfirm: "تأكيد الإلغاء",
+    cancelRefundsInFull: "الإلغاء من طرفنا يستردّ للعميل كامل المبلغ، مهما كانت مدة الإشعار.",
+    actions: "الإجراءات",
     conversionRate: "معدل التحويل",
   },
 

@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { Alert, Container } from "@/components/ui";
 import { getActor } from "@/lib/auth/session";
-import { env } from "@/lib/env";
 import { getDictionary } from "@/lib/i18n";
 import { isLocale, localePath, type Locale } from "@/lib/i18n/config";
 import { writeAudit } from "@/lib/server/audit";
@@ -84,15 +83,35 @@ export default async function AdminLayout({
 
       <Container className="py-6 sm:py-8">
         {/*
-          MFA is mandatory for admin actions in production (enforced in
-          `guard`). Saying so here rather than silently letting an admin browse
-          and then fail on their first mutation.
+          MFA is mandatory for every admin MUTATION, in every environment —
+          `guard`'s `requireMfa` does not consult NODE_ENV. Saying so here
+          rather than letting an admin browse and then fail on their first
+          action with an error that reads like a bug.
+
+          This used to be hidden in production, and worded as though the
+          requirement were production-only. Both were the wrong way round: the
+          wall is real everywhere, and production is exactly where an operator
+          has no console output to explain it.
         */}
-        {!actor.mfaSatisfied && env.NODE_ENV !== "production" && (
+        {!actor.mfaSatisfied && (
           <Alert tone="warning" className="mb-5" title={dict.auth.mfaTitle}>
-            {locale === "ar"
-              ? "لم يتم استيفاء التحقق بخطوتين لهذه الجلسة. في بيئة الإنتاج، تتطلب جميع إجراءات الإدارة تحققاً بخطوتين."
-              : "Two-factor authentication has not been satisfied for this session. In production, every admin action requires it."}
+            {locale === "ar" ? (
+              <>
+                لم يتم استيفاء التحقق بخطوتين لهذه الجلسة، ولذلك ستُرفض جميع إجراءات الإدارة. يمكن
+                الاطّلاع على البيانات دون ذلك.{" "}
+                <Link href={localePath(locale, "/account/security")} className="underline">
+                  تفعيل التحقق بخطوتين
+                </Link>
+              </>
+            ) : (
+              <>
+                Two-factor authentication has not been satisfied for this session, so every admin
+                action will be refused. Viewing data still works.{" "}
+                <Link href={localePath(locale, "/account/security")} className="underline">
+                  Set up two-factor authentication
+                </Link>
+              </>
+            )}
           </Alert>
         )}
 

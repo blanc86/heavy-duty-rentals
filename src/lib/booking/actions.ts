@@ -2,12 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import {
-  UnitNoLongerAvailableError,
-  expireStaleHolds,
-  findAvailableUnits,
-  occupiedPeriod,
-} from "@/lib/availability";
+import { UnitNoLongerAvailableError, findAvailableUnits, occupiedPeriod } from "@/lib/availability";
 import { db } from "@/lib/db";
 import { bookings } from "@/lib/db/schema/booking";
 import { projectSites } from "@/lib/db/schema/identity";
@@ -16,7 +11,11 @@ import { parseHalalas } from "@/lib/money";
 import { refundRentalCharge, startPayment } from "@/lib/payments/service";
 import { quote } from "@/lib/pricing/repository";
 import { getBookingForActor } from "@/lib/booking/repository";
-import { createBooking, transitionBooking } from "@/lib/booking/service";
+import {
+  createBooking,
+  expireAbandonedCheckouts,
+  transitionBooking,
+} from "@/lib/booking/service";
 import { canInCompany } from "@/lib/rbac";
 import { guard, requireActor, toClientError } from "@/lib/server/guard";
 import { getBusinessSettings, refundPercentForNotice } from "@/lib/settings";
@@ -176,7 +175,7 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
         // "no longer available" for a machine that genuinely is. Done here, on
         // the write path, rather than on every read — and it is idempotent, so
         // a scheduled sweeper remains a fine addition, not a prerequisite.
-        await expireStaleHolds();
+        await expireAbandonedCheckouts();
 
         const candidates = await findAvailableUnits({
           classId: data.classId,

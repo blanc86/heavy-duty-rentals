@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Twenty-one bugs found and fixed during the build
+## 2. Twenty-four bugs found and fixed during the build
 
-Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and two from asking what the product promises and checking whether it could keep it.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and five from asking what the product promises — and what an operator would need to run it — and checking whether either was possible.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -143,6 +143,18 @@ The striking part is that every other piece was already correct and simply never
 `createBooking` now writes `held` with a `CHECKOUT_HOLD_MINUTES` expiry. One more piece was needed: reads ignore a lapsed hold, but the exclusion constraint does not — its predicate has no expiry term — so a lapsed row would still reject the insert, and availability would advertise a machine the booking then refused. `expireStaleHolds()` (which had no callers anywhere) now runs on the write path before candidates are chosen; it is idempotent, so a scheduled sweeper remains a fine addition rather than a prerequisite.
 
 Verified all three outcomes against a live machine: while the customer is on the payment page availability reads 0; once the hold lapses it reads 1 again; and a **paid** booking hardens to `confirmed` with a null expiry, so a real rental can never be swept away. A fresh booking then took the freed machine, which exercises the constraint path after the sweep.
+
+**No rental could ever be marked out or returned.** `booking_status` has always had `active` and `completed`, and `transitionBooking` has always been able to reach them. Nothing ever did — the only transitions in the whole codebase were `confirmed` (from the payment webhook) and, once cancellation existed, `cancelled`. The admin console had no Server Actions at all: it could read the business but not run it. Every rental therefore stayed `confirmed` for ever, no machine was ever recorded as being out, and the dashboard's "Active rentals" and "Returns due" tiles were structurally pinned at zero — not empty because business was slow, but because nothing could ever increment them.
+
+Added the three transitions a depot actually generates: **mark on hire**, **mark returned**, and an operator cancellation. The operator cancellation refunds in **full regardless of notice** — the tiers price a customer's change of mind, and charging a penalty for our own breakdown would be indefensible.
+
+Finding this also surfaced a live authorization bug in my own first attempt, which is worth recording because the negative test is what caught it: I guarded the actions with `booking:approve` and `booking:cancel`. Those are **company** permissions — what a customer's own procurement manager holds over their own bookings. A platform admin holds the `admin:*` set, and `canAdmin` checks membership of exactly that set, so the actions refused every real operator. Corrected to `admin:booking` and, for the cancellation, `admin:refund`, since moving money back is the sharper privilege.
+
+Verified the whole lifecycle against a live booking: `pending_payment → confirmed (webhook) → active (admin) → completed (admin)`, each step on the event log with the acting admin recorded. The MFA gate was verified by its refusal first — an admin session without a satisfied second factor had its transition denied and audited, and the booking did not move.
+
+**And the admin MFA warning was inverted.** The console warned that two-factor was unsatisfied only when `NODE_ENV !== "production"`, worded as though the requirement were production-only. `guard`'s `requireMfa` does not consult `NODE_ENV`: the wall is real in every environment, and production — where an operator has no console output to explain a refusal — was precisely where the warning was hidden. It now shows everywhere, says plainly that every admin action will be refused, and links to enrolment.
+
+**Abandoned bookings piled up for ever.** Expiring the hold frees the machine, which is the urgent half; the booking itself stayed `pending_payment` indefinitely and accumulated in the "Awaiting payment" tile with money attached — a number that only grows and nobody can act on. `expired` had been in `booking_status` from the start and nothing ever reached it. `expireAbandonedCheckouts` now closes both halves, as a compare-and-set so a booking paid between the lapse and the sweep is left alone.
 
 ---
 

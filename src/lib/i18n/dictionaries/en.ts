@@ -366,6 +366,12 @@ export const en = {
     newBookings: "New bookings",
     quotesReadOnlyNote:
       "Read-only. Requests above the instant-book capacity threshold need a route survey and a lifting engineer before they can be priced, so the response happens by phone until the quoting workflow is built.",
+    markOnHire: "Mark on hire",
+    markReturned: "Mark returned",
+    cancelBooking: "Cancel",
+    cancelConfirm: "Confirm cancel",
+    cancelRefundsInFull: "Cancelling from our side refunds the customer in full, whatever the notice.",
+    actions: "Actions",
     conversionRate: "Conversion rate",
   },
 
