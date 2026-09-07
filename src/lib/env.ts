@@ -127,6 +127,15 @@ export function assertProductionReady(): void {
         "Configure a real SAMA-licensed PSP.",
     );
   }
+  if (env.RATE_LIMIT_BACKEND === "redis") {
+    // Same shape as the ZATCA switch above: selected, unimplemented, and
+    // silently ignored — while also suppressing the `memory` warning below,
+    // so the operator lost the one signal that would have told them.
+    failures.push(
+      "RATE_LIMIT_BACKEND=redis but the Redis limiter is not implemented. " +
+        "Use `memory` and accept a per-instance limit, or implement it first.",
+    );
+  }
   if (env.RATE_LIMIT_BACKEND === "memory") {
     // Not fatal — a single instance is legitimate — but silence here would let
     // a multi-instance deployment run with limits multiplied by the instance

@@ -86,8 +86,21 @@ export async function checkRateLimit(
   const now = Date.now();
 
   if (env.RATE_LIMIT_BACKEND === "redis") {
-    // BOUNDARY: a Redis-backed limiter belongs here. Not implemented — see
-    // docs/FINAL_REVIEW.md. Falling through to memory is documented, not silent.
+    // BOUNDARY: a Redis-backed limiter belongs here. NOT IMPLEMENTED.
+    //
+    // Falling through to memory used to be the whole of it, and the fallback
+    // was worse than it looked: `assertProductionReady` warns when the backend
+    // is `memory`, so selecting `redis` removed the warning AND kept the
+    // per-process limiter. Someone setting it to fix multi-instance rate
+    // limiting got neither Redis nor the notice that they had not got Redis.
+    //
+    // Startup now refuses `redis` in production outright. This throw covers
+    // every other environment, so the switch can never be quietly ignored.
+    throw new Error(
+      "RATE_LIMIT_BACKEND=redis is selected but the Redis limiter is not implemented. " +
+        "Use `memory` and accept a per-instance limit, or implement this branch. " +
+        "See docs/FINAL_REVIEW.md.",
+    );
   }
 
   sweep(now);

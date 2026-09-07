@@ -66,7 +66,7 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Twenty-eight bugs found and fixed during the build
+## 2. Thirty bugs found and fixed during the build
 
 Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, three from a scan for capabilities nothing can reach, and six from asking what the product promises — and what an operator would need to run it — and checking whether either was possible.
 
@@ -181,6 +181,18 @@ It immediately found two things worth more than the cleanup it was written for.
 **And a config switch on a legally required tax process did nothing.** `getTaxInvoiceProvider` selects the ZATCA adapter from `TAX_INVOICE_PROVIDER`, and `ensureInvoiceForBooking` never called it. `.env.example` stated that selecting `zatca` makes the adapter throw. It did not: invoices were still issued locally and labelled "not cleared", while whoever set the flag believed clearance was on. Setting it now refuses to start in production, and refuses to issue an invoice anywhere else — verified by selecting it and confirming the request fails with **zero invoices created**, where before it would have quietly produced an uncleared one.
 
 The scan still lists seventeen unreferenced helpers. They are cosmetic — dead helper code, not missing buttons — and are left listed rather than swept away, because an automated bulk deletion of them corrupted several files on the first attempt (brace matching does not survive braces inside SQL template literals) and was reverted. They are a cleanup for someone with a spare afternoon, not a defect.
+
+### Found by testing a control instead of reading it
+
+**Password spraying was unthrottled.** Login is rate-limited on the email, and a bucket is keyed on `name:identifier` — so every distinct email gets its own fresh allowance. Hammering one account was stopped at five attempts; trying one likely password against a thousand accounts was not limited at all, because no account ever saw a second attempt.
+
+`loginPerIp` (20 per hour) had been defined for exactly this and was wired to nothing. Worse, the comment above the login limit claimed the identifier was "email + IP" while passing the email alone, which is how the gap survived every reading of that file. Both limits are now applied — they are not substitutes: IP alone locks out a whole site behind one office NAT, email alone lets an attacker walk the user list. The IP budget is cleared on a successful sign-in, so an office is never throttled by its own staff signing in normally; what the limit catches is a *run of failures* with no success in between, which is the shape of an attack rather than of a bad morning.
+
+Verified by driving the real login form: twenty failures across twenty distinct addresses from one IP, then `auth.login_rate_limited / denied` in the audit log — where before all twenty and every one after would have been allowed. A legitimate sign-in still works. Five unit tests now cover the limiter itself, which had none: window, countdown, per-name isolation, reset-on-success, and the per-identifier budget that makes the IP limit necessary.
+
+**And `RATE_LIMIT_BACKEND=redis` was the ZATCA bug again.** The Redis branch is not implemented and fell through to the in-memory limiter. The startup warning only fires when the backend is `memory`, so selecting `redis` removed the warning *and* kept the per-process limiter: an operator setting it to fix multi-instance rate limiting got neither Redis nor any notice that they had not got Redis. It now refuses to start in production and throws anywhere else.
+
+That is two config switches in two days that silently did nothing while looking enabled. Both were on controls the business would be relying on — tax compliance and brute-force protection — and in both cases the honest failure was already written and simply never reached. Worth checking the remaining provider switches (`EMAIL_PROVIDER`, `SMS_PROVIDER`, `STORAGE_PROVIDER`, `SEARCH_PROVIDER`, `ANALYTICS_PROVIDER`) against the same question: if someone selects the unimplemented option, does anything tell them?
 
 ---
 

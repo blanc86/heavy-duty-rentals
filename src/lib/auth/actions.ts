@@ -18,7 +18,7 @@ import {
 } from "./session";
 import { writeAudit } from "@/lib/server/audit";
 import { guard, toClientError } from "@/lib/server/guard";
-import { resetRateLimit } from "@/lib/server/rate-limit";
+import { RateLimitError, checkRateLimit, resetRateLimit } from "@/lib/server/rate-limit";
 import type { Locale } from "@/lib/i18n/config";
 
 export type ActionResult =
@@ -178,12 +178,39 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
       input,
       {
         schema: loginSchema,
-        // Limited per (email + IP) rather than by IP alone: an office behind
-        // one NAT must not lock itself out, and an attacker rotating IPs must
-        // not get unlimited attempts against one account.
+        // Limited per EMAIL here, and additionally per IP inside the handler.
+        // Two separate buckets, deliberately: this one stops someone hammering
+        // a single account, and the IP one stops spraying across many. This
+        // comment used to claim the identifier was "email + IP" while passing
+        // the email alone, which is how the spraying gap survived so long.
         rateLimit: { name: "login", identifier: emailForLimit },
       },
       async ({ input: data, ip, userAgent }) => {
+        // A SECOND limit, keyed on the caller rather than the target.
+        //
+        // `guard` above limits by email, which stops someone hammering one
+        // account. It does nothing against spraying: a bucket is keyed on
+        // `name:identifier`, so a thousand accounts is a thousand fresh
+        // allowances, and one likely password tried against all of them never
+        // trips a per-account limit. `loginPerIp` was defined for exactly this
+        // and was never wired to anything.
+        //
+        // Both are needed, and neither substitutes for the other: IP alone
+        // locks out a whole site behind one office NAT, email alone lets an
+        // attacker walk the user list.
+        const perIp = await checkRateLimit("loginPerIp", ip ?? "unknown");
+        if (!perIp.allowed) {
+          await writeAudit({
+            action: "auth.login_rate_limited",
+            actorType: "anonymous",
+            actorIp: ip ?? null,
+            actorUserAgent: userAgent ?? null,
+            outcome: "denied",
+            metadata: { scope: "ip" },
+          });
+          throw new RateLimitError(perIp.retryAfterSeconds);
+        }
+
         const [user] = await db
           .select({
             id: users.id,
@@ -259,6 +286,12 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
           .where(eq(users.id, user.id));
 
         await resetRateLimit("login", data.email);
+        // The IP budget is cleared on success too, so a busy office behind one
+        // NAT is not throttled by its own staff signing in normally. What the
+        // IP limit is there to stop is a run of FAILURES from one address, and
+        // clearing on success leaves that intact: an attacker without working
+        // credentials never reaches this line.
+        await resetRateLimit("loginPerIp", ip ?? "unknown");
 
         // Does this account carry a confirmed second factor?
         const [mfa] = await db
