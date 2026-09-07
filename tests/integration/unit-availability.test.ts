@@ -106,7 +106,13 @@ describe.skipIf(!available)("a machine can be taken out of service", () => {
     const sql = getSql();
     if (!unitId) throw new Error("unit fixture missing");
 
-    const [user] = await sql`SELECT id FROM "user" LIMIT 1`;
+    // A SEEDED user, not "whatever row comes back first". Another test file
+    // creates and deletes its own users, so an unordered LIMIT 1 can hand
+    // back a row that is gone by the time this insert runs — which it did,
+    // as a foreign-key violation that had nothing to do with the assertion.
+    const [user] = await sql`
+      SELECT id FROM "user" WHERE email = 'customer@example.com' LIMIT 1
+    `;
     if (!user) throw new Error("no user seeded");
 
     const bookingId = uuidv7();

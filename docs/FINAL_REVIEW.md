@@ -192,7 +192,13 @@ Verified by driving the real login form: twenty failures across twenty distinct 
 
 **And `RATE_LIMIT_BACKEND=redis` was the ZATCA bug again.** The Redis branch is not implemented and fell through to the in-memory limiter. The startup warning only fires when the backend is `memory`, so selecting `redis` removed the warning *and* kept the per-process limiter: an operator setting it to fix multi-instance rate limiting got neither Redis nor any notice that they had not got Redis. It now refuses to start in production and throws anywhere else.
 
-That is two config switches in two days that silently did nothing while looking enabled. Both were on controls the business would be relying on — tax compliance and brute-force protection — and in both cases the honest failure was already written and simply never reached. Worth checking the remaining provider switches (`EMAIL_PROVIDER`, `SMS_PROVIDER`, `STORAGE_PROVIDER`, `SEARCH_PROVIDER`, `ANALYTICS_PROVIDER`) against the same question: if someone selects the unimplemented option, does anything tell them?
+That is two config switches in two days that silently did nothing while looking enabled. Both were on controls the business would be relying on — tax compliance and brute-force protection — and in both cases the honest failure was already written and simply never reached. So the remaining provider switches got the same question — if someone selects the unimplemented option, does anything tell them? — and **none of them did**.
+
+`EMAIL_PROVIDER`, `SMS_PROVIDER` and `STORAGE_PROVIDER` are validated by the schema and then read by no code at all. `EMAIL_PROVIDER=smtp` on a production deploy sent exactly as much mail as `console` did — none — while looking configured. `STORAGE_PROVIDER=s3` selects an S3 driver that does not exist, alongside five `S3_*` keys presented as working configuration. Selecting any of the three now refuses to start in production, and `.env.example` says plainly that nothing is sent yet rather than describing `console` as though it logged something.
+
+`SEARCH_PROVIDER` and `ANALYTICS_PROVIDER` were worse: listed in `.env.example`, absent from the environment schema, read by nothing. They were never settings — a typo in either would have gone unnoticed because nothing parsed them. Search is Postgres full-text and analytics land in our own database; both are decisions in the code, not switches. Removed rather than left looking adjustable.
+
+Seven switches, five of which did nothing. The pattern is the same one the reachability scan was built for, wearing different clothes: a seam left for future work is fine, but a seam that presents itself as a working control is discovered by a customer not receiving something.
 
 ---
 

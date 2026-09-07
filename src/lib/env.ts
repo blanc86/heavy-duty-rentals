@@ -121,6 +121,29 @@ export function assertProductionReady(): void {
     );
   }
 
+  // The rest of the provider switches, checked in one place for one reason.
+  //
+  // Two of these were found silently doing nothing (ZATCA above, and Redis
+  // below), so the whole family got the same question: if someone selects the
+  // option that is not implemented, does anything tell them? For these three it
+  // did not. Each is validated by the schema and then consumed by no code at
+  // all, so `EMAIL_PROVIDER=smtp` on a production deploy sent exactly as much
+  // mail as `console` did — none — while looking configured.
+  //
+  // The notification and object-storage layers are honest, documented gaps
+  // (docs/FINAL_REVIEW.md §3). A gap is fine. A gap wearing a working switch is
+  // not, because it is discovered by a customer not receiving something.
+  const unimplemented: [string, boolean, string][] = [
+    ["EMAIL_PROVIDER=smtp", env.EMAIL_PROVIDER === "smtp", "no mail transport is implemented"],
+    ["SMS_PROVIDER=http", env.SMS_PROVIDER === "http", "no SMS transport is implemented"],
+    ["STORAGE_PROVIDER=s3", env.STORAGE_PROVIDER === "s3", "no S3 driver is implemented"],
+  ];
+  for (const [setting, selected, why] of unimplemented) {
+    if (selected) {
+      failures.push(`${setting} but ${why}. Leave it at its default until that work is done.`);
+    }
+  }
+
   if (env.PAYMENT_PROVIDER === "mock") {
     failures.push(
       "PAYMENT_PROVIDER=mock moves no money and must never run in production. " +

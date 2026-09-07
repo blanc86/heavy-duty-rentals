@@ -149,7 +149,13 @@ describe.skipIf(!available)("an abandoned checkout releases its machine", () => 
     const { expireAbandonedCheckouts } = await import("@/lib/booking/service");
 
     const [unit] = await sql`SELECT id FROM equipment_unit OFFSET 3 LIMIT 1`;
-    const [user] = await sql`SELECT id FROM "user" LIMIT 1`;
+    // A SEEDED user, not "whatever row comes back first". Another test file
+    // creates and deletes its own users, so an unordered LIMIT 1 can hand
+    // back a row that is gone by the time this insert runs — which it did,
+    // as a foreign-key violation that had nothing to do with the assertion.
+    const [user] = await sql`
+      SELECT id FROM "user" WHERE email = 'customer@example.com' LIMIT 1
+    `;
     const [cls] = await sql`SELECT id FROM equipment_class LIMIT 1`;
     if (!unit || !user || !cls) throw new Error("fixtures missing — run npm run db:seed");
 
