@@ -2,11 +2,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Alert, Badge, Card, CardBody, Container, ScrollX } from "@/components/ui";
+import { CancelBooking } from "@/components/booking/cancel-booking";
 import { getActor } from "@/lib/auth/session";
 import { getBookingForActor } from "@/lib/booking/repository";
 import { getDictionary } from "@/lib/i18n";
 import { formatDate, formatNumber, isLocale, localePath, type Locale } from "@/lib/i18n/config";
 import { formatMoney } from "@/lib/money";
+import { getBusinessSettings, refundPercentForNotice } from "@/lib/settings";
+
+/**
+ * Mirrors `CANCELLABLE_STATUSES` in the cancel action. The server decides; this
+ * only controls whether the control is offered, so a stale copy here can hide
+ * the button but can never authorise a cancellation the action would refuse.
+ */
+const CANCELLABLE: readonly string[] = ["pending_payment", "confirmed"];
 
 export async function generateMetadata({
   params,
@@ -58,6 +67,13 @@ export default async function BookingDetailPage({
   if (!booking) notFound();
 
   const money = (value: bigint) => formatMoney(value, locale, booking.currency);
+
+  // Cancellation entitlement, computed from the SAME settings the published
+  // policy page and the rental agreement render from — a customer must never be
+  // quoted one schedule and charged against another.
+  const business = await getBusinessSettings();
+  const hoursNotice = Math.max(0, (booking.startDate.getTime() - Date.now()) / (1000 * 60 * 60));
+  const refundPercent = refundPercentForNotice(business.cancellationTiers, hoursNotice);
   const isConfirmed = booking.status === "confirmed" || booking.status === "active";
   const awaitingPayment = booking.status === "pending_payment";
 
@@ -332,6 +348,27 @@ export default async function BookingDetailPage({
             {dict.booking.downloadInvoice}
           </Link>
         </div>
+
+        {/* Cancellation. Shown only while it is actually possible, so the page
+            never offers an action that will be refused. The refund figure is
+            computed here from the same tiers the policy page renders, and shown
+            BEFORE the customer commits. */}
+        {CANCELLABLE.includes(booking.status) && (
+          <div className="mt-6">
+            <CancelBooking
+              reference={booking.reference}
+              locale={locale}
+              dict={dict}
+              hoursNotice={hoursNotice}
+              refundPercent={refundPercent}
+              refundDueHalalas={(
+                ((booking.taxableSubtotalHalalas + booking.vatHalalas) * BigInt(refundPercent)) /
+                100n
+              ).toString()}
+              currency={booking.currency}
+            />
+          </div>
+        )}
 
         {booking.termsAcceptedAt && (
           <p className="mt-4 text-center text-xs text-steel-500">

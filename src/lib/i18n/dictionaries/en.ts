@@ -259,6 +259,19 @@ export const en = {
     holdExpiring: "We are holding this machine for you for {minutes} minutes.",
     holdExpired: "Your hold expired and the machine was released. Please check availability again.",
     priceChanged: "The price changed while you were booking. Please review the updated breakdown.",
+    cancelTitle: "Cancel this rental",
+    cancelBody:
+      "Cancelling releases the machine straight away. Your refund follows the cancellation policy you accepted, based on how much notice you are giving.",
+    cancelNotice: "Notice given",
+    cancelRefundDue: "Refund due",
+    cancelCta: "Cancel this rental",
+    cancelConfirm: "Yes, cancel it",
+    cancelKeep: "Keep my booking",
+    cancelled: "This rental has been cancelled and the machine has been released.",
+    cancelRefunded: "A refund of {amount} has been issued to your original payment method.",
+    cancelRefundPending:
+      "Your refund of {amount} is being processed. If it has not reached you within five working days, contact us with this booking reference.",
+    cancelNoRefund: "No refund is due at this notice period, under the policy you accepted.",
     unitTaken: "That machine was just booked by someone else. Here are alternatives.",
   },
 

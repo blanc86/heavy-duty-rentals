@@ -8,13 +8,22 @@ import { bookings } from "@/lib/db/schema/booking";
 import { projectSites } from "@/lib/db/schema/identity";
 import { uuidv7 } from "@/lib/ids";
 import { parseHalalas } from "@/lib/money";
-import { startPayment } from "@/lib/payments/service";
+import { refundRentalCharge, startPayment } from "@/lib/payments/service";
 import { quote } from "@/lib/pricing/repository";
-import { createBooking } from "@/lib/booking/service";
+import { getBookingForActor } from "@/lib/booking/repository";
+import { createBooking, transitionBooking } from "@/lib/booking/service";
 import { canInCompany } from "@/lib/rbac";
 import { guard, requireActor, toClientError } from "@/lib/server/guard";
-import { getBusinessSettings } from "@/lib/settings";
+import { getBusinessSettings, refundPercentForNotice } from "@/lib/settings";
 import { env } from "@/lib/env";
+
+/**
+ * Statuses a CUSTOMER may cancel from.
+ *
+ * `active` is deliberately absent: once the machine is on site, ending the hire
+ * is an off-hire with a collection to arrange, not a cancellation.
+ */
+const CANCELLABLE_STATUSES = ["pending_payment", "confirmed"] as const;
 
 export type BookingActionResult =
   | { ok: true; reference: string; bookingId: string; redirectUrl: string }
@@ -280,4 +289,125 @@ export async function getBookingReference(reference: string): Promise<string | n
     .where(eq(bookings.reference, reference))
     .limit(1);
   return row?.id ?? null;
+}
+
+const cancelBookingSchema = z
+  .object({
+    reference: z.string().min(4).max(40),
+    locale: z.enum(["en", "ar"]).default("en"),
+  })
+  .strict();
+
+export type CancelResult =
+  | { ok: true; refundedHalalas: string; refundPercent: number; refundPending: boolean }
+  | { ok: false; error: { code: string; message: string } };
+
+/**
+ * Cancel a booking the actor owns.
+ *
+ * A platform whose premise is "book online without phoning anyone" has to let
+ * people UN-book the same way. Until this existed, `transitionBooking` could
+ * cancel, the cancellation policy was published, the rental agreement quoted
+ * the customer their refund entitlement — and there was no way to act on any
+ * of it. A machine held by a booking nobody could cancel also stayed out of
+ * inventory, so this is a fleet-utilisation problem as much as a UX one.
+ *
+ * The refund percentage comes from the SAME settings the published policy page
+ * and the rental agreement render from, so the customer cannot be quoted one
+ * schedule and charged against another.
+ *
+ * Order is deliberate: release the machine first, refund second. A refund that
+ * fails must not leave a cancelled customer holding a crane, and the refund row
+ * survives as `pending` for an operator to retry.
+ */
+export async function cancelBookingAction(input: unknown): Promise<CancelResult> {
+  try {
+    return await guard(
+      input,
+      {
+        schema: cancelBookingSchema,
+        requireAuth: true,
+        rateLimit: { name: "bookingCreate" },
+        audit: { action: "booking.cancel", resourceType: "booking" },
+      },
+      async ({ input: data, actor: maybeActor }) => {
+        const actor = requireActor(maybeActor);
+
+        // Scoped read: a booking the actor cannot see does not exist to them.
+        const booking = await getBookingForActor(actor, data.reference, data.locale);
+        if (!booking) {
+          return {
+            ok: false as const,
+            error: { code: "not_found", message: "That booking was not found." },
+          };
+        }
+
+        if (!(CANCELLABLE_STATUSES as readonly string[]).includes(booking.status)) {
+          return {
+            ok: false as const,
+            error: {
+              code: "not_cancellable",
+              message: "This booking can no longer be cancelled online. Please contact us.",
+            },
+          };
+        }
+
+        const business = await getBusinessSettings();
+        const hoursNotice = Math.max(
+          0,
+          (booking.startDate.getTime() - Date.now()) / (1000 * 60 * 60),
+        );
+        const refundPercent = refundPercentForNotice(business.cancellationTiers, hoursNotice);
+
+        // Release the machine. A compare-and-set, so a double submit or a race
+        // with an admin cancelling the same booking resolves to one transition.
+        const moved = await transitionBooking({
+          bookingId: booking.id,
+          toStatus: "cancelled",
+          expectedFrom: CANCELLABLE_STATUSES,
+          actorUserId: actor.userId,
+          actorType: "customer",
+          type: "booking.cancelled_by_customer",
+          metadata: {
+            hoursNotice: Math.round(hoursNotice),
+            refundPercent,
+            termsVersion: business.termsVersion,
+          },
+        });
+
+        if (!moved) {
+          return {
+            ok: false as const,
+            error: {
+              code: "not_cancellable",
+              message: "This booking can no longer be cancelled online. Please contact us.",
+            },
+          };
+        }
+
+        // Percentage of what was actually CHARGED, not of the total — the total
+        // includes a deposit that was never collected online.
+        const charged = booking.taxableSubtotalHalalas + booking.vatHalalas;
+        const refundAmount = (charged * BigInt(refundPercent)) / 100n;
+
+        const refund = await refundRentalCharge({
+          bookingId: booking.id,
+          amountHalalas: refundAmount,
+          reason: `Cancelled by customer with ${Math.round(hoursNotice)}h notice (${refundPercent}%)`,
+          requestedByUserId: actor.userId,
+        });
+
+        return {
+          ok: true as const,
+          refundedHalalas: refund.refunded.toString(),
+          refundPercent,
+          // Told, not hidden: the booking is cancelled either way, but the
+          // customer must know whether the money has actually moved.
+          refundPending: refund.status === "pending" || refund.status === "failed",
+        };
+      },
+    );
+  } catch (error) {
+    return { ok: false, error: toClientError(error) };
+  }
 }

@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Nineteen bugs found and fixed during the build
+## 2. Twenty bugs found and fixed during the build
 
-Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, and three from measuring the layout at 375px and reading the browser console.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and one from asking what the product promises and checking whether it could keep it.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -123,6 +123,16 @@ The route sweep only checks URLs someone remembered to put in it, so it now also
 **Every JSON-LD block was being refused by our own CSP.** The policy is `script-src 'self' 'nonce-…' 'strict-dynamic'`, and CSP applies to *every* `<script>` element — including a `type="application/ld+json"` data block that never executes. Next.js nonces its own 18 script tags; the twelve structured-data blocks the application renders were not nonced, so a crawler rendering with CSP enforced would see none of them. This is the worst kind of silent: the markup is present in the HTML, so viewing source passes, and `verify-flow`'s existing check that `"@type":"Product"` appears in the body passed too. All twelve now go through a `cspNonce()` helper, and two new assertions check that the JSON-LD is nonced and that no script on the page is missing one.
 
 **Hot reload had been dead the whole time.** `strict-dynamic` disables host-source expressions, so `'self'` stops applying — and Turbopack's hot-reload client, served from this origin but not nonced, was blocked. The server kept compiling while the browser kept showing the previous build, which presents as a caching bug and cost real time before the console explained it. Development now omits `strict-dynamic` (keeping the nonce, so the production path is still exercised); production is byte-identical.
+
+### Found by asking what the product promises
+
+**Nobody could cancel a booking.** The site sells "book online, no phone calls needed", and there was no way to un-book online. Everything underneath was already built: `transitionBooking` cancels and releases the reservation, the cancellation tiers live in settings, the policy page publishes the refund schedule from those tiers, and the rental agreement quotes the customer their own entitlement. What was missing was any way to act on it — and `provider.refund()` had no callers anywhere, so no refund had ever been issued by any code path.
+
+The consequence was not only a broken promise. A machine held by a booking nobody could cancel stayed out of inventory until someone noticed by hand, which makes this a fleet-utilisation problem as well as a UX one.
+
+Built the customer cancellation: the refund figure is computed from the *same* settings the policy page renders, and shown **before** the customer commits, behind a confirm step. Order is deliberate — release the machine first, refund second, so a failed payout cannot leave a cancelled customer holding a crane; the refund row survives as `pending` for an operator to retry, and the failure is audited. The refund is a percentage of what was **charged**, never of the total, because the total includes a deposit that was never collected online.
+
+Verified end to end: a booking with 657 hours' notice landed in the 100% tier, refunded SAR 22,977 through the provider, moved the payment to `refunded`, released the reservation — and the availability API went from 0 to 1 for those dates, which is the only proof that "released" means anything. Eight unit tests pin the tier boundaries (167 hours is not "about a week"), the negative-notice case, and the fact that the refund arithmetic rounds *down* so a rounding error can never overpay.
 
 ---
 

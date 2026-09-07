@@ -1,7 +1,7 @@
-import { eq, sql as raw } from "drizzle-orm";
+import { and, eq, sql as raw } from "drizzle-orm";
 import { db, isUniqueViolation } from "@/lib/db";
 import { bookings } from "@/lib/db/schema/booking";
-import { payments, paymentWebhookEvents } from "@/lib/db/schema/finance";
+import { payments, paymentWebhookEvents, refunds } from "@/lib/db/schema/finance";
 import { uuidv7 } from "@/lib/ids";
 import type { Halalas } from "@/lib/money";
 import { transitionBooking } from "@/lib/booking/service";
@@ -353,4 +353,133 @@ export async function capturedTotal(bookingId: string): Promise<Halalas> {
     WHERE booking_id = ${bookingId} AND status IN ('captured', 'partially_refunded')
   `);
   return BigInt(rows[0]?.total ?? "0");
+}
+
+/**
+ * Refund a captured rental charge, in whole or in part.
+ *
+ * Called when a booking is cancelled. The AMOUNT is decided by the caller from
+ * the published cancellation tiers — this function moves money and records it,
+ * it does not decide policy.
+ *
+ * Ordering matters. The refund row is written FIRST, in `pending`, so a refund
+ * that reaches the provider but whose response is lost still leaves a record to
+ * reconcile against. Losing money silently is worse than an unreconciled row.
+ *
+ * Idempotency is the `idempotencyKey` unique index: a retried cancellation
+ * finds the existing row and returns it rather than refunding twice.
+ */
+export async function refundRentalCharge(params: {
+  bookingId: string;
+  amountHalalas: Halalas;
+  reason: string;
+  requestedByUserId?: string | null;
+}): Promise<{ refunded: Halalas; status: "succeeded" | "pending" | "failed" | "skipped" }> {
+  if (params.amountHalalas <= 0n) return { refunded: 0n, status: "skipped" };
+
+  const [payment] = await db
+    .select({
+      id: payments.id,
+      providerChargeId: payments.providerChargeId,
+      providerIntentId: payments.providerIntentId,
+      capturedHalalas: payments.capturedHalalas,
+      refundedHalalas: payments.refundedHalalas,
+    })
+    .from(payments)
+    .where(and(eq(payments.bookingId, params.bookingId), eq(payments.kind, "rental_charge")))
+    .limit(1);
+
+  // Nothing was ever captured — a booking cancelled before payment. Not an
+  // error, and not something to invent a refund for.
+  if (!payment || payment.capturedHalalas <= 0n) return { refunded: 0n, status: "skipped" };
+
+  // Never refund more than remains. Clamping here means a policy bug cannot
+  // become a payout larger than the customer ever paid.
+  const remaining = payment.capturedHalalas - payment.refundedHalalas;
+  const amount = params.amountHalalas > remaining ? remaining : params.amountHalalas;
+  if (amount <= 0n) return { refunded: 0n, status: "skipped" };
+
+  const idempotencyKey = `refund_${payment.id}_cancel`;
+  const refundId = uuidv7();
+
+  await db
+    .insert(refunds)
+    .values({
+      id: refundId,
+      paymentId: payment.id,
+      amountHalalas: amount,
+      reason: params.reason,
+      status: "pending",
+      requestedByUserId: params.requestedByUserId ?? null,
+      idempotencyKey,
+    })
+    .onConflictDoNothing({ target: refunds.idempotencyKey });
+
+  const [row] = await db
+    .select({ id: refunds.id, status: refunds.status, amountHalalas: refunds.amountHalalas })
+    .from(refunds)
+    .where(eq(refunds.idempotencyKey, idempotencyKey))
+    .limit(1);
+
+  // A refund already settled for this cancellation: report it, do not repeat it.
+  if (row && row.id !== refundId && row.status === "succeeded") {
+    return { refunded: row.amountHalalas, status: "succeeded" };
+  }
+
+  const effectiveId = row?.id ?? refundId;
+  const chargeId = payment.providerChargeId ?? payment.providerIntentId;
+  if (!chargeId) {
+    return { refunded: 0n, status: "pending" };
+  }
+
+  try {
+    const result = await getPaymentProvider().refund({
+      providerChargeId: chargeId,
+      amountHalalas: amount,
+      reason: params.reason,
+      idempotencyKey,
+    });
+
+    await db
+      .update(refunds)
+      .set({ status: result.status, providerRefundId: result.providerRefundId })
+      .where(eq(refunds.id, effectiveId));
+
+    if (result.status === "succeeded") {
+      const refundedTotal = payment.refundedHalalas + amount;
+      await db
+        .update(payments)
+        .set({
+          refundedHalalas: refundedTotal,
+          status: refundedTotal >= payment.capturedHalalas ? "refunded" : "partially_refunded",
+          updatedAt: new Date(),
+        })
+        .where(eq(payments.id, payment.id));
+
+      await db
+        .update(bookings)
+        .set({ refundHalalas: refundedTotal, updatedAt: new Date() })
+        .where(eq(bookings.id, params.bookingId));
+    }
+
+    return { refunded: result.status === "succeeded" ? amount : 0n, status: result.status };
+  } catch (error) {
+    // The booking is already cancelled and the machine already released. A
+    // failed payout must not undo that — it stays `pending` for an operator to
+    // retry, and is audited so it cannot be lost.
+    await db.update(refunds).set({ status: "failed" }).where(eq(refunds.id, effectiveId));
+    await writeAudit({
+      action: "payment.refund_failed",
+      actorUserId: params.requestedByUserId ?? null,
+      actorType: "system",
+      resourceType: "booking",
+      resourceId: params.bookingId,
+      outcome: "failure",
+      metadata: {
+        amountHalalas: amount.toString(),
+        error: error instanceof Error ? error.message : "unknown",
+      },
+    });
+    return { refunded: 0n, status: "failed" };
+  }
 }
