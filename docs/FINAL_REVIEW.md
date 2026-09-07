@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Twenty bugs found and fixed during the build
+## 2. Twenty-one bugs found and fixed during the build
 
-Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and one from asking what the product promises and checking whether it could keep it.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and two from asking what the product promises and checking whether it could keep it.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -133,6 +133,16 @@ The consequence was not only a broken promise. A machine held by a booking nobod
 Built the customer cancellation: the refund figure is computed from the *same* settings the policy page renders, and shown **before** the customer commits, behind a confirm step. Order is deliberate — release the machine first, refund second, so a failed payout cannot leave a cancelled customer holding a crane; the refund row survives as `pending` for an operator to retry, and the failure is audited. The refund is a percentage of what was **charged**, never of the total, because the total includes a deposit that was never collected online.
 
 Verified end to end: a booking with 657 hours' notice landed in the 100% tier, refunded SAR 22,977 through the provider, moved the payment to `refunded`, released the reservation — and the availability API went from 0 to 1 for those dates, which is the only proof that "released" means anything. Eight unit tests pin the tier boundaries (167 hours is not "about a week"), the negative-notice case, and the fact that the refund arithmetic rounds *down* so a rounding error can never overpay.
+
+**Every abandoned checkout permanently retired a machine.** `createBooking` writes the reservation before the customer has paid, and it wrote it as `confirmed` with **no expiry**. A customer who closed the tab on the payment page therefore removed that machine from the fleet for good: the booking sat in `pending_payment` for ever, nothing expired the reservation, and the exclusion constraint kept honouring it.
+
+Abandoned checkouts are ordinary traffic — declined cards, cold feet, a dropped connection — so this leaked inventory continuously, and the only symptom would have been utilisation slowly looking wrong months later. Of everything found in this review, it is the one that would have cost the business real money without ever announcing itself.
+
+The striking part is that every other piece was already correct and simply never fed a hold: `transitionBooking` hardens a `held` reservation to `confirmed` with a null expiry the moment payment lands, `findAvailableUnits` ignores a hold whose expiry has passed, and `expireStaleHolds` clears the rows. The design intended holds throughout; one INSERT wrote the wrong status and quietly disabled all of it.
+
+`createBooking` now writes `held` with a `CHECKOUT_HOLD_MINUTES` expiry. One more piece was needed: reads ignore a lapsed hold, but the exclusion constraint does not — its predicate has no expiry term — so a lapsed row would still reject the insert, and availability would advertise a machine the booking then refused. `expireStaleHolds()` (which had no callers anywhere) now runs on the write path before candidates are chosen; it is idempotent, so a scheduled sweeper remains a fine addition rather than a prerequisite.
+
+Verified all three outcomes against a live machine: while the customer is on the payment page availability reads 0; once the hold lapses it reads 1 again; and a **paid** booking hardens to `confirmed` with a null expiry, so a real rental can never be swept away. A fresh booking then took the freed machine, which exercises the constraint path after the sweep.
 
 ---
 

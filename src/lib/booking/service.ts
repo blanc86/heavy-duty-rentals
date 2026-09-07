@@ -390,15 +390,32 @@ async function insertReservation(
   input: CreateBookingInput,
   period: TstzRange,
 ): Promise<void> {
+  // HELD, with an expiry — not `confirmed`.
+  //
+  // This row is written before the customer has paid. Written as `confirmed`
+  // with no expiry, a customer who closes the tab on the payment page would
+  // remove the machine from the fleet PERMANENTLY: the booking sits in
+  // `pending_payment` for ever, nothing expires the reservation, and the
+  // exclusion constraint keeps honouring it. Abandoned checkouts are ordinary
+  // traffic — declined cards, cold feet, a dropped connection — so each one
+  // would quietly retire a machine, with slowly-wrong utilisation as the only
+  // symptom.
+  //
+  // The rest of the machinery already assumed a hold and was simply never fed
+  // one: `transitionBooking` hardens a held reservation to `confirmed` with a
+  // null expiry the moment payment lands, `findAvailableUnits` ignores a hold
+  // whose expiry has passed, and `expireStaleHolds` clears the rows out.
+  const expiresAt = new Date(Date.now() + CHECKOUT_HOLD_MINUTES * 60_000);
+
   await tx.execute(raw`
     INSERT INTO reservation
       (id, unit_id, booking_id, status, period, billable_start, billable_end, expires_at)
     VALUES
-      (${uuidv7()}, ${input.unitId}, ${bookingId}, 'confirmed',
+      (${uuidv7()}, ${input.unitId}, ${bookingId}, 'held',
        ${`[${period.start.toISOString()},${period.end.toISOString()})`}::tstzrange,
        ${input.startDate.toISOString()}::timestamptz,
        ${input.endDate.toISOString()}::timestamptz,
-       NULL)
+       ${expiresAt.toISOString()}::timestamptz)
   `);
 }
 

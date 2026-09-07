@@ -2,7 +2,12 @@
 
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { UnitNoLongerAvailableError, findAvailableUnits, occupiedPeriod } from "@/lib/availability";
+import {
+  UnitNoLongerAvailableError,
+  expireStaleHolds,
+  findAvailableUnits,
+  occupiedPeriod,
+} from "@/lib/availability";
 import { db } from "@/lib/db";
 import { bookings } from "@/lib/db/schema/booking";
 import { projectSites } from "@/lib/db/schema/identity";
@@ -161,6 +166,17 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
           classInfo.mobilisationBufferDays,
           classInfo.demobilisationBufferDays,
         );
+
+        // Clear lapsed holds before looking for a machine.
+        //
+        // Reads already ignore an expired hold, but the exclusion constraint
+        // does not: its predicate is `status IN ('held','confirmed','active')`
+        // with no expiry term, so a lapsed row still rejects the insert. Without
+        // this, availability would say "1 free" and the booking would fail with
+        // "no longer available" for a machine that genuinely is. Done here, on
+        // the write path, rather than on every read — and it is idempotent, so
+        // a scheduled sweeper remains a fine addition, not a prerequisite.
+        await expireStaleHolds();
 
         const candidates = await findAvailableUnits({
           classId: data.classId,

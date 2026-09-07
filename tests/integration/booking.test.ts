@@ -165,6 +165,42 @@ describe.runIf(available)("createBooking", () => {
     expect(rows[0]?.status).toBe("pending_payment");
   });
 
+  it("reserves the unit as an EXPIRING hold, not a permanent booking", async () => {
+    // The reservation is written before the customer has paid. Written as
+    // `confirmed` with no expiry, an abandoned checkout would remove the
+    // machine from the fleet permanently — the booking would sit in
+    // `pending_payment` for ever and nothing would release it. Abandoned
+    // checkouts are ordinary traffic, so that is a silent inventory leak.
+    const { createBooking } = await import("@/lib/booking/service");
+    const { quote } = await import("@/lib/pricing/repository");
+
+    // Its own window: the fixture unit is shared, and the exclusion constraint
+    // would (correctly) reject a second booking over another test's dates.
+    const { start, end } = dates(400, 5);
+    const input = await baseInput({ startDate: start, endDate: end });
+    const { result } = await quote({
+      classId: input.classId,
+      branchId: input.branchId,
+      startDate: start,
+      endDate: end,
+      quantity: 1,
+      addons: [],
+      deliveryRequired: false,
+    });
+
+    const booking = await createBooking({ ...input, clientTotalHalalas: result.totalHalalas });
+
+    const sql = getSql();
+    const [reservation] = await sql<{ status: string; expires_at: Date | null }[]>`
+      SELECT status, expires_at FROM reservation WHERE booking_id = ${booking.bookingId}
+    `;
+
+    expect(reservation?.status).toBe("held");
+    // An expiry is the whole point: it is what lets the machine come back.
+    expect(reservation?.expires_at).not.toBeNull();
+    expect(new Date(reservation!.expires_at!).getTime()).toBeGreaterThan(Date.now());
+  });
+
   it("REJECTS a tampered total and writes an audit event", async () => {
     const { createBooking, PriceMismatchError } = await import("@/lib/booking/service");
     const input = await baseInput({ ...dates(30, 3) });
