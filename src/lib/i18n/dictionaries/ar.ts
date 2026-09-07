@@ -378,6 +378,18 @@ export const ar: Dictionary = {
     cancelConfirm: "تأكيد الإلغاء",
     cancelRefundsInFull: "الإلغاء من طرفنا يستردّ للعميل كامل المبلغ، مهما كانت مدة الإشعار.",
     actions: "الإجراءات",
+    statusAvailable: "متاحة",
+    statusMaintenance: "صيانة",
+    statusInspection: "فحص",
+    statusOutOfService: "خارج الخدمة",
+    blockDates: "حجب تواريخ",
+    reason: "السبب",
+    reasonTransport: "نقل",
+    reasonOther: "أخرى",
+    collidingBookings: "حجوزات قائمة على هذه المعدة",
+    collidingBookingsHelp:
+      "لا تُلغى تلقائياً. تواصل مع كل عميل، أو ألغِ الحجز من شاشة الحجوزات.",
+    noCollidingBookings: "لا توجد حجوزات متأثرة.",
     conversionRate: "معدل التحويل",
   },
 

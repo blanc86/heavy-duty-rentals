@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Twenty-four bugs found and fixed during the build
+## 2. Twenty-five bugs found and fixed during the build
 
-Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and five from asking what the product promises — and what an operator would need to run it — and checking whether either was possible.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and six from asking what the product promises — and what an operator would need to run it — and checking whether either was possible.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -155,6 +155,14 @@ Verified the whole lifecycle against a live booking: `pending_payment → confir
 **And the admin MFA warning was inverted.** The console warned that two-factor was unsatisfied only when `NODE_ENV !== "production"`, worded as though the requirement were production-only. `guard`'s `requireMfa` does not consult `NODE_ENV`: the wall is real in every environment, and production — where an operator has no console output to explain a refusal — was precisely where the warning was hidden. It now shows everywhere, says plainly that every admin action will be refused, and links to enrolment.
 
 **Abandoned bookings piled up for ever.** Expiring the hold frees the machine, which is the urgent half; the booking itself stayed `pending_payment` indefinitely and accumulated in the "Awaiting payment" tile with money attached — a number that only grows and nobody can act on. `expired` had been in `booking_status` from the start and nothing ever reached it. `expireAbandonedCheckouts` now closes both halves, as a compare-and-set so a booking paid between the lapse and the sweep is left alone.
+
+**A machine that broke down could not be taken off the market.** The same shape again, and the sharper version of it. `equipment_unit.status` and `unit_blackout` were both READ by the booking path from the beginning — `createBooking` refuses a unit in `maintenance` or `out_of_service`, and `findAvailableUnits` excludes any unit with an overlapping blackout. Neither was ever WRITTEN by anything. So a crane that threw a hydraulic line kept accepting online bookings, and the depot had to phone customers to cancel them — the exact failure this platform exists to remove.
+
+Added two controls to the inventory screen: set a unit's operational status, and block a date range for a service or a statutory inspection. Only the statuses a person sets by hand are offered — `reserved`, `rented` and `in_transit` describe where a machine is in a rental and are derived from bookings, so hand-editing them would let the fleet's state and its bookings disagree with no way to tell which is true.
+
+Both report the bookings they collide with, and **neither cancels anything**. An operator grounding a crane needs to see that three bookings are stacked behind it; discovering that later, one angry phone call at a time, is how a fleet loses customers. But releasing a customer's machine is a decision with money and a phone call attached, and it belongs to a person — so the software names the conflicts and stops. That promise is pinned by a test, because an "improvement" that quietly automated the cancellation would be a serious regression no type or constraint would catch.
+
+Verified live: grounding the Riyadh crane took availability from 1 to 0; a blackout blocked its own window and left the surrounding dates untouched; and grounding a machine with a live booking on it named that booking on screen while leaving the booking and its reservation `confirmed`.
 
 ---
 

@@ -372,6 +372,18 @@ export const en = {
     cancelConfirm: "Confirm cancel",
     cancelRefundsInFull: "Cancelling from our side refunds the customer in full, whatever the notice.",
     actions: "Actions",
+    statusAvailable: "Available",
+    statusMaintenance: "Maintenance",
+    statusInspection: "Inspection",
+    statusOutOfService: "Out of service",
+    blockDates: "Block dates",
+    reason: "Reason",
+    reasonTransport: "Transport",
+    reasonOther: "Other",
+    collidingBookings: "Bookings already on this machine",
+    collidingBookingsHelp:
+      "These are not cancelled automatically. Contact each customer, or cancel from the Bookings screen.",
+    noCollidingBookings: "No bookings affected.",
     conversionRate: "Conversion rate",
   },
 

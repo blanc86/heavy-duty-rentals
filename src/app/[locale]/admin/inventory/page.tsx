@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge, Card, ScrollX, Select } from "@/components/ui";
 import { listAdminUnits } from "@/lib/admin/repository";
 import { listBranches } from "@/lib/catalog/repository";
+import { AdminUnitControls } from "@/components/admin/unit-controls";
 import { getDictionary } from "@/lib/i18n";
 import { formatDate, formatNumber, isLocale, type Locale } from "@/lib/i18n/config";
 
@@ -117,6 +118,9 @@ export default async function AdminInventoryPage({
                 <th scope="col" className="px-4 py-2.5 text-start font-semibold text-steel-700">
                   {locale === "ar" ? "على الإيجار" : "On hire"}
                 </th>
+                <th scope="col" className="px-4 py-2.5 text-start">
+                  {dict.admin.actions}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -184,6 +188,9 @@ export default async function AdminInventoryPage({
                       </td>
                       <td className="px-4 py-2.5 text-steel-700 numeric-latin">
                         {u.currentBookingReference ?? "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <AdminUnitControls unitId={u.id} status={u.status} dict={dict} />
                       </td>
                     </tr>
                   );
