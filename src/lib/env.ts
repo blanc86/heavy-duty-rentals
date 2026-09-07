@@ -107,6 +107,20 @@ export function assertProductionReady(): void {
   if (!env.DATABASE_URL.includes("sslmode=require")) {
     failures.push("DATABASE_URL must use sslmode=require: customer PII must not cross the network in the clear.");
   }
+  // ZATCA Phase 2 is NOT implemented. `.env.example` said selecting it made the
+  // adapter throw — but nothing called the adapter, so selecting it did nothing
+  // at all: invoices were still issued locally and labelled "not cleared" while
+  // whoever set the flag believed clearance was on. A silently ignored switch
+  // on a legally required tax process is worse than one that either works or
+  // fails, so it now refuses to start.
+  if (env.TAX_INVOICE_PROVIDER === "zatca") {
+    failures.push(
+      "TAX_INVOICE_PROVIDER=zatca but ZATCA Phase 2 clearance is not implemented. " +
+        "It needs CSID onboarding, a cryptographic stamp identity and sandbox certification. " +
+        "Leave it as `local` until that work is done — see docs/research.md §6.",
+    );
+  }
+
   if (env.PAYMENT_PROVIDER === "mock") {
     failures.push(
       "PAYMENT_PROVIDER=mock moves no money and must never run in production. " +

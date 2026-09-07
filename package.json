@@ -22,6 +22,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "verify:routes": "node scripts/verify-routes.mjs",
+    "verify:reachable": "node scripts/verify-reachable.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {

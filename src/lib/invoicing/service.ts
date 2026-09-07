@@ -137,6 +137,19 @@ export async function ensureInvoiceForBooking(bookingId: string): Promise<string
   if (!booking) return null;
   if (!["confirmed", "active", "completed"].includes(booking.status)) return null;
 
+  // Defence in depth behind the startup check in `assertProductionReady`.
+  // That one refuses to boot; this one refuses to issue, which also covers
+  // development and any environment that skipped the boot assertion. Either
+  // way, selecting a clearance provider that does not exist must not quietly
+  // produce an uncleared invoice.
+  const provider = getTaxInvoiceProvider();
+  if (provider.name !== "local" && !provider.isConfigured) {
+    throw new Error(
+      `Tax invoice provider "${provider.name}" is selected but not configured. ` +
+        "Refusing to issue an invoice that would be presented as cleared when it is not.",
+    );
+  }
+
   const business = await getBusinessSettings();
 
   // Buyer identity is SNAPSHOTTED, not joined: a company later changing its

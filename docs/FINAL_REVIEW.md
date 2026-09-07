@@ -66,9 +66,9 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Twenty-five bugs found and fixed during the build
+## 2. Twenty-eight bugs found and fixed during the build
 
-Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, and six from asking what the product promises — and what an operator would need to run it — and checking whether either was possible.
+Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, three from a scan for capabilities nothing can reach, and six from asking what the product promises — and what an operator would need to run it — and checking whether either was possible.
 
 **Transport silently priced at zero.** When no branch was selected, `loadTransport` returned an empty result, so a delivery-required quote omitted mobilisation entirely. On a class where transport can be 20–40% of the job that is a serious underquote. Fixed: the servicing branch is now resolved from the units that actually stock the class, and if none can be determined the engine **refuses to price** and routes to a quote rather than returning zero.
 
@@ -163,6 +163,24 @@ Added two controls to the inventory screen: set a unit's operational status, and
 Both report the bookings they collide with, and **neither cancels anything**. An operator grounding a crane needs to see that three bookings are stacked behind it; discovering that later, one angry phone call at a time, is how a fleet loses customers. But releasing a customer's machine is a decision with money and a phone call attached, and it belongs to a person — so the software names the conflicts and stops. That promise is pinned by a test, because an "improvement" that quietly automated the cancellation would be a serious regression no type or constraint would catch.
 
 Verified live: grounding the Riyadh crane took availability from 1 to 0; a blackout blocked its own window and left the surrounding dates untouched; and grounding a machine with a live booking on it named that booking on screen while leaving the booking and its reservation `confirmed`.
+
+### The pattern, and a scan for it
+
+Five of the defects above are the same shape: a capability built, guarded, audited and tested, with **nothing wired to reach it**. Sign-out, change-password, booking cancellation, the booking lifecycle transitions, and taking a machine out of service were each complete underneath and had no caller.
+
+Every one was invisible to the things that normally catch problems — types checked, lint passed, tests passed, routes returned 200 — because an exported function nobody calls is not *wrong*, it is merely absent from the product. Only opening the page shows the button is missing, and there are more pages than anyone re-checks by hand.
+
+So `npm run verify:reachable` now looks for it: exported symbols in `src/lib` and `src/components` that nothing references. It distinguishes "referenced nowhere at all" from "used only inside its own module" — reporting those together is what makes a check like this cry wolf until people stop reading it — and it exits 0, because an unreferenced export is a question rather than a defect.
+
+It immediately found two things worth more than the cleanup it was written for.
+
+**An unauthenticated booking-reference oracle.** `getBookingReference` lived in a `"use server"` module, which makes **every export a callable HTTP endpoint**. It had no `guard`, no actor, no ownership predicate — despite a doc comment claiming it was "scoped to the actor". Anyone able to invoke it could confirm whether a booking reference existed and receive its internal UUID, which is precisely what the rest of the codebase is careful not to disclose (every scoped read returns 404 rather than confirming existence). It was called by nothing, so it was deleted rather than guarded: a guarded endpoint nobody needs is still an endpoint. `newIdempotencyKey` went with it — the checkout mints its own key server-side.
+
+**Session rotation was written and never called.** `rotateSession` revokes the old session and issues a new token, which is the standard response to a privilege elevation. The MFA challenge instead marked the *existing* token satisfied. The token in the browser during the challenge is only half-authenticated, so anyone who had obtained a copy of it — a shared depot machine, a leaked log line — would find their copy silently upgraded to a fully privileged session the moment the real user passed the challenge. The challenge now rotates. Verified against live session rows: the pre-challenge token is revoked and a new one carries the elevated session, with sign-in still working.
+
+**And a config switch on a legally required tax process did nothing.** `getTaxInvoiceProvider` selects the ZATCA adapter from `TAX_INVOICE_PROVIDER`, and `ensureInvoiceForBooking` never called it. `.env.example` stated that selecting `zatca` makes the adapter throw. It did not: invoices were still issued locally and labelled "not cleared", while whoever set the flag believed clearance was on. Setting it now refuses to start in production, and refuses to issue an invoice anywhere else — verified by selecting it and confirming the request fails with **zero invoices created**, where before it would have quietly produced an uncleared one.
+
+The scan still lists seventeen unreferenced helpers. They are cosmetic — dead helper code, not missing buttons — and are left listed rather than swept away, because an automated bulk deletion of them corrupted several files on the first attempt (brace matching does not survive braces inside SQL template literals) and was reverted. They are a cleanup for someone with a spare afternoon, not a defect.
 
 ---
 

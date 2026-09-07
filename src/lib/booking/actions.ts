@@ -4,9 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { UnitNoLongerAvailableError, findAvailableUnits, occupiedPeriod } from "@/lib/availability";
 import { db } from "@/lib/db";
-import { bookings } from "@/lib/db/schema/booking";
 import { projectSites } from "@/lib/db/schema/identity";
-import { uuidv7 } from "@/lib/ids";
 import { parseHalalas } from "@/lib/money";
 import { refundRentalCharge, startPayment } from "@/lib/payments/service";
 import { quote } from "@/lib/pricing/repository";
@@ -289,21 +287,6 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
   } catch (error) {
     return { ok: false, error: toClientError(error) };
   }
-}
-
-/** A stable idempotency key for one checkout attempt, generated server-side. */
-export async function newIdempotencyKey(): Promise<string> {
-  return uuidv7();
-}
-
-/** Look up a booking by reference, scoped to the actor. Used by the confirmation page. */
-export async function getBookingReference(reference: string): Promise<string | null> {
-  const [row] = await db
-    .select({ id: bookings.id })
-    .from(bookings)
-    .where(eq(bookings.reference, reference))
-    .limit(1);
-  return row?.id ?? null;
 }
 
 const cancelBookingSchema = z

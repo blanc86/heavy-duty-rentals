@@ -19,8 +19,12 @@ import {
 } from "./mfa";
 import {
   getPendingMfaSession,
+  // Enrolment keeps its session: the user is ALREADY fully authenticated there,
+  // and is adding a factor rather than elevating a half-authenticated token.
   markSessionMfaSatisfied,
   revokeAllSessionsForUser,
+  rotateSession,
+  setSessionCookie,
 } from "./session";
 
 export type MfaResult<T = unknown> =
@@ -284,7 +288,20 @@ export async function verifyMfaChallenge(input: unknown): Promise<MfaResult<{ re
           });
         }
 
-        await markSessionMfaSatisfied(pending.sessionId);
+        // ROTATE rather than mark the existing session satisfied.
+        //
+        // Passing the second factor is a privilege elevation, and the token
+        // that was in the browser during the challenge was only ever a
+        // half-authenticated one. Anyone who obtained a copy of it — a shared
+        // depot machine, a leaked log line — would otherwise find their copy
+        // silently upgraded to a fully privileged session the moment the real
+        // user completed the challenge. Issuing a new token leaves the stolen
+        // one revoked and useless.
+        const rotated = await rotateSession(pending.sessionId, pending.userId, {
+          mfaSatisfied: true,
+        });
+        await setSessionCookie(rotated.token, rotated.expiresAt);
+
         await resetRateLimit("mfaVerify", pending.userId);
 
         await writeAudit({
