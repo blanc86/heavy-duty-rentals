@@ -108,7 +108,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
                 ]
             ).map(([title, body]) => (
               <li key={title} className="flex gap-3">
-                <span aria-hidden="true" className="mt-1 text-amber-600">
+                <span aria-hidden="true" className="mt-1 text-amber-700">
                   ▸
                 </span>
                 <span>

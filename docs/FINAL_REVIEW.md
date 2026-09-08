@@ -66,7 +66,7 @@ Plus two live suites, both passing: `scripts/verify-flow.mjs` (33 HTTP checks) a
 
 ---
 
-## 2. Thirty bugs found and fixed during the build
+## 2. Thirty-three bugs found and fixed during the build
 
 Recorded because all twelve were real defects, not cosmetic. Two would have broken every booking in production. The rest were found by driving the application through a browser rather than asserting against it over HTTP — four from the booking form, four from sweeping every route and every remaining form, four more from following every link the site renders, three from measuring the layout at 375px and reading the browser console, three from a scan for capabilities nothing can reach, and six from asking what the product promises — and what an operator would need to run it — and checking whether either was possible.
 
@@ -199,6 +199,22 @@ That is two config switches in two days that silently did nothing while looking 
 `SEARCH_PROVIDER` and `ANALYTICS_PROVIDER` were worse: listed in `.env.example`, absent from the environment schema, read by nothing. They were never settings — a typo in either would have gone unnoticed because nothing parsed them. Search is Postgres full-text and analytics land in our own database; both are decisions in the code, not switches. Removed rather than left looking adjustable.
 
 Seven switches, five of which did nothing. The pattern is the same one the reachability scan was built for, wearing different clothes: a seam left for future work is fine, but a seam that presents itself as a working control is discovered by a customer not receiving something.
+
+### Found by auditing accessibility
+
+Accessibility had never been tested at all. `npm run verify:a11y` now runs axe-core in a real browser against WCAG 2.2 A and AA, across 36 page renders: the customer funnel, the signed-in pages and the admin console, **in both locales**. Arabic is not a re-run of the English pass — it is right-to-left, so it exercises different layout code with its own reading-order and contrast failure modes. Signed-in pages are included by minting a session, because auditing only the marketing pages would be auditing the easy half.
+
+It found three violation types, and all three were on pages that matter.
+
+**The availability calendar handed screen readers a broken grid.** It was a CSS grid carrying `role="grid"` with flat `columnheader` and `gridcell` children and no rows between them — structurally invalid ARIA, since a grid must contain rows and a columnheader must sit inside one. Two *critical* violations, on the single page the whole product exists for: the calendar is the feature that answers "is it free on the 14th" without a phone call, and for anyone using a screen reader it was answering in noise.
+
+The fix was not better ARIA but none at all. A calendar is tabular data, so it is now a real `<table>` with `<tr>`, `<th scope="col">` and `<td>`, which carry the same meaning natively and correctly with no role attribute to get wrong. The per-day readout ("14 March, 3 available") moved from `aria-label` to visually hidden text, so it is also available to translation and find-in-page.
+
+**Amber text failed contrast at 3.01:1.** `text-amber-600` on white measures 3.01:1 — under the 4.5:1 body-text threshold. Moved to `amber-700` at 4.77:1 wherever it was used as text; the checkbox and radio accents keep amber-600, which is a UI component at a 3:1 bar.
+
+**And a token that passes on white failed on the admin shell.** `text-steel-500` is 4.72:1 on white, where all 105 of its uses live — except one, a note I had added on the admin quotes page, which sits directly on the console's `bg-steel-100` rather than inside a white card. There it measures **4.31:1**, just under. Fixed to `steel-600`, with the constraint written down next to it so the next thing placed on the admin background does not repeat it.
+
+Two notes on the audit itself, both worth keeping. First, `page.addScriptTag` could not inject axe: our own CSP refuses an un-nonced inline script, which is the policy working correctly. The audit evaluates the source through the debugging protocol instead, so it runs against the real policy rather than needing it relaxed. Second, the first run reported the booking CTA as a contrast failure while its styles were still settling — it actually measures 9.19:1. The script now waits for the network to quiet before measuring and reports axe's "inconclusive" results separately from real violations, because a check that cries wolf gets ignored, which is the one way an audit like this fails completely.
 
 ---
 

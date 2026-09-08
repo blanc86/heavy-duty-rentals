@@ -172,7 +172,12 @@ export default async function AdminQuotesPage({
         )}
       </Card>
 
-      <p className="text-xs text-steel-500">{dict.admin.quotesReadOnlyNote}</p>
+      {/* steel-600, not steel-500. The admin shell is `bg-steel-100`, and
+          steel-500 measures 4.31:1 against it — under the 4.5:1 needed for body
+          text, though it passes at 4.72:1 on the white it is used on elsewhere.
+          Anything placed directly on the admin background rather than inside a
+          Card needs the darker token. */}
+      <p className="text-xs text-steel-600">{dict.admin.quotesReadOnlyNote}</p>
     </div>
   );
 }

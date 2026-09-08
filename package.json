@@ -23,6 +23,7 @@
     "test:e2e": "playwright test",
     "verify:routes": "node scripts/verify-routes.mjs",
     "verify:reachable": "node scripts/verify-reachable.mjs",
+    "verify:a11y": "node scripts/verify-a11y.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
@@ -44,6 +45,7 @@
     "@types/qrcode": "1.5.6",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
+    "axe-core": "^4.11.0",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.5",
     "tailwindcss": "4.3.3",

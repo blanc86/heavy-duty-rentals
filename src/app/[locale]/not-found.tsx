@@ -15,7 +15,7 @@ import { en } from "@/lib/i18n/dictionaries/en";
 export default function LocaleNotFound() {
   return (
     <Container className="py-16 text-center sm:py-24">
-      <p className="text-sm font-semibold uppercase tracking-wide text-amber-600 numeric-latin">
+      <p className="text-sm font-semibold uppercase tracking-wide text-amber-700 numeric-latin">
         404
       </p>
       <h1 className="mt-2 text-2xl font-bold tracking-tight text-steel-950 sm:text-3xl">

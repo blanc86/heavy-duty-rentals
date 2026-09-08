@@ -200,7 +200,7 @@ export default async function ForContractorsPage({
                     </p>
                   </div>
                   <div className="border-steel-200 sm:border-s sm:ps-8">
-                    <p className="text-2xs font-semibold uppercase tracking-wide text-amber-600">
+                    <p className="text-2xs font-semibold uppercase tracking-wide text-amber-700">
                       {isArabic ? "على هذه المنصة" : "On this platform"}
                     </p>
                     <p className="mt-1.5 text-sm leading-relaxed text-steel-800">{item.answer}</p>

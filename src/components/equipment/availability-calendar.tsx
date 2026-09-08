@@ -51,63 +51,89 @@ export function AvailabilityCalendar({
 
   const maxUnits = Math.max(...days.map((d) => d.totalUnits), 1);
 
+  // Chunk into calendar weeks. A table needs real rows; a flat grid does not.
+  const weeks: (DayAvailability | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
   return (
     <div className="rounded-[--radius-card] border border-steel-200 bg-white p-4">
-      <div
-        role="grid"
-        aria-label={dict.a11y.calendar}
-        className="grid grid-cols-7 gap-1 text-center"
-      >
-        {weekdayLabels.map((label) => (
-          <div
-            key={label}
-            role="columnheader"
-            className="pb-1 text-2xs font-semibold uppercase tracking-wide text-steel-500"
-          >
-            {label}
-          </div>
-        ))}
+      {/*
+        A real <table>, not `role="grid"` on a div.
 
-        {cells.map((day, index) => {
-          if (!day) return <div key={`blank-${index}`} role="gridcell" aria-hidden="true" />;
+        This was a CSS grid carrying `role="grid"` with flat `columnheader` and
+        `gridcell` children and no rows between them. That is structurally
+        invalid ARIA — a grid must contain rows, and a columnheader must sit
+        inside one — so a screen reader was handed a broken grid on the single
+        page the whole product exists for.
 
-          const ratio = day.availableUnits / maxUnits;
-          const tone =
-            day.availableUnits === 0
-              ? "bg-[--color-danger-bg] text-[--color-danger] border-[--color-danger]/20"
-              : ratio <= 0.34
-                ? "bg-[--color-warning-bg] text-[--color-warning] border-[--color-warning]/20"
-                : "bg-[--color-available-bg] text-[--color-available] border-[--color-available]/20";
+        A calendar is tabular data, so the fix is not better ARIA but none at
+        all: `<table>`, `<tr>`, `<th scope="col">` and `<td>` carry the same
+        meaning natively, correctly, and without a role attribute to get wrong.
+      */}
+      <table className="w-full table-fixed border-collapse text-center">
+        <caption className="sr-only">{dict.a11y.calendar}</caption>
+        <thead>
+          <tr>
+            {weekdayLabels.map((label) => (
+              <th
+                key={label}
+                scope="col"
+                className="pb-1 text-2xs font-semibold uppercase tracking-wide text-steel-600"
+              >
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((week, weekIndex) => (
+            <tr key={`week-${weekIndex}`}>
+              {week.map((day, dayIndex) => {
+                if (!day) return <td key={`blank-${weekIndex}-${dayIndex}`} className="p-0.5" />;
 
-          const date = new Date(`${day.date}T00:00:00Z`);
+                const ratio = day.availableUnits / maxUnits;
+                const tone =
+                  day.availableUnits === 0
+                    ? "bg-[--color-danger-bg] text-[--color-danger] border-[--color-danger]/20"
+                    : ratio <= 0.34
+                      ? "bg-[--color-warning-bg] text-[--color-warning] border-[--color-warning]/20"
+                      : "bg-[--color-available-bg] text-[--color-available] border-[--color-available]/20";
 
-          return (
-            <div
-              key={day.date}
-              role="gridcell"
-              // The accessible name carries the full meaning — a screen-reader
-              // user gets "14 March, 3 available", not just a coloured square.
-              aria-label={`${formatDate(date, locale)}: ${
-                day.availableUnits === 0
-                  ? dict.equipment.noUnitsAvailable
-                  : dict.equipment.unitsAvailable.replace(
-                      "{count}",
-                      formatNumber(day.availableUnits, locale),
-                    )
-              }`}
-              title={`${formatDate(date, locale)} — ${formatNumber(day.availableUnits, locale)}/${formatNumber(day.totalUnits, locale)}`}
-              className={`rounded border px-1 py-1.5 text-xs ${tone}`}
-            >
-              <span className="block font-semibold numeric-latin">
-                {formatNumber(date.getUTCDate(), locale)}
-              </span>
-              <span className="block text-2xs numeric-latin">
-                {formatNumber(day.availableUnits, locale)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+                const date = new Date(`${day.date}T00:00:00Z`);
+                const readout = `${formatDate(date, locale)}: ${
+                  day.availableUnits === 0
+                    ? dict.equipment.noUnitsAvailable
+                    : dict.equipment.unitsAvailable.replace(
+                        "{count}",
+                        formatNumber(day.availableUnits, locale),
+                      )
+                }`;
+
+                return (
+                  <td key={day.date} className="p-0.5">
+                    <div
+                      title={`${formatDate(date, locale)} — ${formatNumber(day.availableUnits, locale)}/${formatNumber(day.totalUnits, locale)}`}
+                      className={`rounded border px-1 py-1.5 text-xs ${tone}`}
+                    >
+                      {/* The full meaning, for anyone not seeing the colour:
+                          "14 March, 3 available" rather than a green square.
+                          Visually hidden rather than an aria-label, so it is
+                          also available to translation and to find-in-page. */}
+                      <span className="sr-only">{readout}</span>
+                      <span aria-hidden="true" className="block font-semibold numeric-latin">
+                        {formatNumber(date.getUTCDate(), locale)}
+                      </span>
+                      <span aria-hidden="true" className="block text-2xs numeric-latin">
+                        {formatNumber(day.availableUnits, locale)}
+                      </span>
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-steel-600">
         <li className="flex items-center gap-1.5">
