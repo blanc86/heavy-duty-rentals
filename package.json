@@ -24,6 +24,7 @@
     "verify:routes": "node scripts/verify-routes.mjs",
     "verify:reachable": "node scripts/verify-reachable.mjs",
     "verify:a11y": "node scripts/verify-a11y.mjs",
+    "pentest": "node scripts/pentest.mjs",
     "verify": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {

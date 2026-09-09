@@ -106,6 +106,8 @@ src/
 db/migrations/           0000 generated · 0001 hand-written integrity constraints
 ```
 
+**Changing the code?** Start with [`docs/CODE_GUIDE.md`](docs/CODE_GUIDE.md) — how a request flows, where the invariants live, and the driver and framework quirks that have already caused real bugs here.
+
 Full detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/DATABASE.md`](docs/DATABASE.md) · [`docs/SECURITY.md`](docs/SECURITY.md) · [`docs/PRD.md`](docs/PRD.md)
 
 ### The three load-bearing decisions

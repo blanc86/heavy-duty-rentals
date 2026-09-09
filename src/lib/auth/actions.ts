@@ -8,6 +8,7 @@ import { companyMembers, companies, mfaCredentials, users } from "@/lib/db/schem
 import { uuidv7 } from "@/lib/ids";
 import { getDummyHash, hashPassword, verifyPassword } from "./crypto";
 import { checkPassword, passwordSchema } from "./password-policy";
+import { safeLoginRedirect } from "./safe-redirect";
 import {
   clearSessionCookie,
   createSession,
@@ -326,13 +327,11 @@ export async function loginAction(input: unknown): Promise<ActionResult> {
         });
 
         // Only same-origin relative paths are accepted, so `redirectTo` cannot
-        // be turned into an open redirect to an attacker's site.
-        const safeRedirect =
-          data.redirectTo &&
-          /^\/[a-z]{2}(\/|$)/.test(data.redirectTo) &&
-          !data.redirectTo.startsWith("//")
-            ? data.redirectTo
-            : `/${data.locale}/account`;
+        // be turned into an open redirect to an attacker's site. The rule lives
+        // in its own module with its own tests — inline, it was the one thing
+        // standing between a real login and a phishing hand-off, and nothing
+        // could assert on it.
+        const safeRedirect = safeLoginRedirect(data.redirectTo, data.locale);
 
         if (requiresMfa) {
           // Carry the intended destination through the challenge so the user

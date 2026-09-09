@@ -216,6 +216,40 @@ The fix was not better ARIA but none at all. A calendar is tabular data, so it i
 
 Two notes on the audit itself, both worth keeping. First, `page.addScriptTag` could not inject axe: our own CSP refuses an un-nonced inline script, which is the policy working correctly. The audit evaluates the source through the debugging protocol instead, so it runs against the real policy rather than needing it relaxed. Second, the first run reported the booking CTA as a contrast failure while its styles were still settling — it actually measures 9.19:1. The script now waits for the network to quiet before measuring and reports axe's "inconclusive" results separately from real violations, because a check that cries wolf gets ignored, which is the one way an audit like this fails completely.
 
+### Found by attacking it
+
+`npm run pentest` probes the running application adversarially: 51 checks across
+IDOR, vertical escalation, session forgery, SQL injection, path traversal, open
+redirect, stored XSS, cookie flags, enumeration, security headers, and the
+database privilege model. It is the opposite question from `verify-flow` — that
+asserts the product *works*, this asserts it *refuses* — and a feature can work
+perfectly while handing a stranger someone else's invoice.
+
+**Everything held.** 51 of 51, including the ones most likely to be wrong: a
+second customer gets a 404 (not a 403) on someone else's booking, invoice and
+agreement; a customer reaching `/admin` gets a 404 rather than learning the
+section exists; five injection payloads leave the schema intact; six traversal
+shapes are refused by the media route; and a hostile quote renders escaped in
+the admin console rather than executing.
+
+The one thing this did change is a defence that could not be asserted on. The
+post-login redirect was validated by an inline regular expression inside
+`loginAction` — the single rule standing between a genuine login and a phishing
+hand-off, and nothing could test it. It is now `safeLoginRedirect`, a named
+function with a bypass corpus: absolute URLs, protocol-relative `//`,
+single-slash `https:/`, backslashes that browsers normalise to slashes, control
+characters used to smuggle a header, and paths that are not locale-prefixed.
+
+Worth recording that the pen test's **first run reported four breaches that were
+not real**. It checked whether the payload appeared anywhere in the login page's
+HTML — and it always does, because `?next=` is passed to a client component as a
+prop and React serialises it into the RSC payload. That is not a redirect. The
+application was refusing all four correctly, confirmed by driving a real login
+in a browser and landing on `/en/account`. The probe now checks what actually
+matters: that no response carries an off-site `Location` and no page emits an
+off-site meta refresh. A security check that cries wolf is worse than none,
+because the fifth false alarm is the one nobody investigates.
+
 ---
 
 ## 3. What was intentionally not implemented
