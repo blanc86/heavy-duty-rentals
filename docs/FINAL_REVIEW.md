@@ -250,6 +250,14 @@ matters: that no response carries an off-site `Location` and no page emits an
 off-site meta refresh. A security check that cries wolf is worse than none,
 because the fifth false alarm is the one nobody investigates.
 
+The first CI run then exposed the opposite failure. It reported a pass at **42
+controls, not 51**: the IDOR section read whatever booking happened to exist and
+skipped itself on a fresh database, so the single most valuable part of the file
+— one customer reading another's booking and invoice — quietly did not run in
+the environment it most needed to. It creates its own booking fixture now and
+cannot skip. A probe that silently omits its best checks is the same defect as a
+config switch that silently does nothing, wearing different clothes.
+
 ---
 
 ## 3. What was intentionally not implemented
