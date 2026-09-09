@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { Alert, Container } from "@/components/ui";
-import { getActor } from "@/lib/auth/session";
+import { getFullActor } from "@/lib/auth/session";
 import { getDictionary } from "@/lib/i18n";
 import { isLocale, localePath, type Locale } from "@/lib/i18n/config";
 import { writeAudit } from "@/lib/server/audit";
@@ -27,7 +27,7 @@ export default async function AdminLayout({
   const locale: Locale = rawLocale;
   const dict = getDictionary(locale);
 
-  const actor = await getActor();
+  const actor = await getFullActor();
 
   if (!actor) {
     redirect(localePath(locale, `/login?next=${encodeURIComponent(`/${locale}/admin`)}`));
@@ -50,6 +50,7 @@ export default async function AdminLayout({
   const nav = [
     { href: "/admin", label: dict.admin.dashboard },
     { href: "/admin/bookings", label: dict.admin.bookings },
+    { href: "/admin/customers", label: dict.admin.customers },
     { href: "/admin/quotes", label: dict.admin.quotes },
     { href: "/admin/inventory", label: dict.admin.inventory },
     { href: "/admin/utilization", label: dict.admin.utilization },

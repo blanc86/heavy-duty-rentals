@@ -4,8 +4,7 @@ import { and, eq, isNotNull, sql as raw } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { companyMembers, companies, mfaCredentials, users } from "@/lib/db/schema/identity";
-import { uuidv7 } from "@/lib/ids";
+import { mfaCredentials, users } from "@/lib/db/schema/identity";
 import { getDummyHash, hashPassword, verifyPassword } from "./crypto";
 import { checkPassword, passwordSchema } from "./password-policy";
 import { safeLoginRedirect } from "./safe-redirect";
@@ -34,132 +33,25 @@ const emailSchema = z
   .max(320)
   .transform((v) => v.trim().toLowerCase());
 
-const registerSchema = z
-  .object({
-    fullName: z.string().min(2).max(200).trim(),
-    email: emailSchema,
-    phone: z.string().max(32).trim().optional(),
-    password: passwordSchema,
-    locale: z.enum(["en", "ar"]).default("en"),
-    // PDPL: separate, unbundled, never pre-ticked. Accepting terms is a
-    // different act from consenting to marketing, and conflating them is one
-    // of the violations SDAIA actively penalises.
-    marketingConsent: z.boolean().default(false),
-    companyName: z.string().max(240).trim().optional(),
-  })
-  .strict();
-
-export async function registerAction(input: unknown): Promise<ActionResult> {
-  try {
-    return await guard(
-      input,
-      { schema: registerSchema, rateLimit: { name: "register" } },
-      async ({ input: data, ip }) => {
-        const policy = checkPassword(data.password, { email: data.email, name: data.fullName });
-        if (!policy.ok) {
-          return {
-            ok: false as const,
-            error: { code: "weak_password", message: policy.reason ?? "Password is too weak." },
-          };
-        }
-
-        const passwordHash = await hashPassword(data.password);
-        const userId = uuidv7();
-
-        try {
-          await db.transaction(async (tx) => {
-            await tx.insert(users).values({
-              id: userId,
-              email: data.email,
-              fullName: data.fullName,
-              phone: data.phone ?? null,
-              passwordHash,
-              preferredLocale: data.locale,
-
-              // ACTIVE on registration, with `emailVerifiedAt` left null.
-              //
-              // The account is usable; the email address is recorded as
-              // unproven, which is the truth. Registering as
-              // `pending_verification` instead would be a dead end today:
-              // `resolveSession` grants no actor to a non-active user, so a new
-              // customer would receive a valid session, be redirected to
-              // /account, be bounced straight back to sign-in, and loop there
-              // — with no verification email to escape it, because the
-              // notification layer is not built (docs/FINAL_REVIEW.md §3).
-              //
-              // What actually guards identity here is downstream and stronger
-              // than an email click: a booking requires a successful card
-              // payment, and the machine is not released without an ID check at
-              // handover (docs/SECURITY.md §8). When the email transport lands,
-              // `emailVerifiedAt` is the column that flips, and gating whatever
-              // then needs a proven address is a smaller change than this
-              // comment.
-              status: "active",
-              marketingConsentAt: data.marketingConsent ? new Date() : null,
-              marketingConsentSource: data.marketingConsent ? "registration" : null,
-              marketingConsentIp: data.marketingConsent ? (ip ?? null) : null,
-            });
-
-            if (data.companyName) {
-              const companyId = uuidv7();
-              await tx.insert(companies).values({
-                id: companyId,
-                nameEn: data.companyName,
-                status: "pending_review",
-                contactEmail: data.email,
-              });
-              await tx.insert(companyMembers).values({
-                id: uuidv7(),
-                companyId,
-                userId,
-                role: "owner",
-                status: "active",
-                joinedAt: new Date(),
-              });
-            }
-          });
-        } catch (error) {
-          // A duplicate email must not disclose that the account exists. We
-          // return the same shape as success — the legitimate owner gets
-          // nothing new, and an enumerator learns nothing.
-          if (
-            typeof error === "object" &&
-            error !== null &&
-            "code" in error &&
-            error.code === "23505"
-          ) {
-            await writeAudit({
-              action: "auth.register_duplicate_email",
-              actorType: "anonymous",
-              actorIp: ip ?? null,
-              outcome: "failure",
-            });
-            return { ok: true as const, redirectTo: `/${data.locale}/login?registered=1` };
-          }
-          throw error;
-        }
-
-        const session = await createSession({ userId, ipAddress: ip });
-        await setSessionCookie(session.token, session.expiresAt);
-
-        await writeAudit({
-          action: "auth.registered",
-          actorUserId: userId,
-          actorType: "customer",
-          actorIp: ip ?? null,
-          resourceType: "user",
-          resourceId: userId,
-          outcome: "success",
-          metadata: { marketingConsent: data.marketingConsent },
-        });
-
-        return { ok: true as const, redirectTo: `/${data.locale}/account` };
-      },
-    );
-  } catch (error) {
-    return { ok: false, error: toClientError(error) };
-  }
-}
+/**
+ * There is no registration action, and that is deliberate.
+ *
+ * Customers do not have accounts: a booking is made as a guest and reopened
+ * with its reference plus the email it was booked with (`lib/booking/guest.ts`).
+ * Requiring a signup in front of a hire cost bookings and bought nothing —
+ * identity is checked at handover and the money is checked by the card.
+ *
+ * Nor is there an admin screen that creates one. Onboarding an account holder
+ * securely needs a way to deliver a set-your-password link to a proven address,
+ * and this deployment has no email transport (docs/FINAL_REVIEW.md §3). The
+ * alternative — an admin typing a password and relaying it out of band — hands
+ * a real credential around in plaintext, so it is not offered. When the email
+ * transport lands, that is the flow to build.
+ *
+ * The company/procurement features (PO numbers, cost centres, consolidated
+ * invoicing) still work for accounts that exist; they are seeded, not
+ * self-served.
+ */
 
 const loginSchema = z
   .object({

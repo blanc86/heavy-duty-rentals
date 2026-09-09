@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { MfaChallenge } from "@/components/auth/mfa-challenge";
 import { Card, CardBody, Container } from "@/components/ui";
-import { getActor, getPendingMfaSession } from "@/lib/auth/session";
+import { getFullActor, getPendingMfaSession } from "@/lib/auth/session";
 import { getDictionary } from "@/lib/i18n";
 import { isLocale, localePath, type Locale } from "@/lib/i18n/config";
 
@@ -38,7 +38,7 @@ export default async function MfaChallengePage({
   const dict = getDictionary(locale);
 
   // Already fully authenticated — nothing to challenge.
-  const actor = await getActor();
+  const actor = await getFullActor();
   if (actor) redirect(localePath(locale, "/account"));
 
   const pending = await getPendingMfaSession();

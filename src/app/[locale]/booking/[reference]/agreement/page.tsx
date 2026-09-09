@@ -49,7 +49,8 @@ export default async function AgreementPage({
     redirect(
       localePath(
         locale,
-        `/login?next=${encodeURIComponent(`/${locale}/booking/${reference}/agreement`)}`,
+        // See the booking detail page: guests return via reference + email.
+        `/booking?ref=${encodeURIComponent(reference)}`,
       ),
     );
   }

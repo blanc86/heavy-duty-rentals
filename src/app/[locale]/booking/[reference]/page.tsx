@@ -53,7 +53,10 @@ export default async function BookingDetailPage({
 
   const actor = await getActor();
   if (!actor) {
-    redirect(localePath(locale, `/login?next=${encodeURIComponent(`/${locale}/booking/${reference}`)}`));
+  // No customer accounts: an unidentified visitor proves ownership with the
+  // reference and the email it was booked with. The reference is prefilled
+  // because they already have it; the email is what actually gates access.
+    redirect(localePath(locale, `/booking?ref=${encodeURIComponent(reference)}`));
   }
 
   /**
@@ -381,11 +384,15 @@ export default async function BookingDetailPage({
           </p>
         )}
 
-        <p className="mt-6 text-center text-sm">
-          <Link href={localePath(locale, "/account")} className="text-steel-700 underline">
-            {dict.account.title}
-          </Link>
-        </p>
+        {/* A guest has no account to return to — their session covers this one
+            booking. Linking "My rentals" at them would land back on this page. */}
+        {!actor.scopedBookingId && (
+          <p className="mt-6 text-center text-sm">
+            <Link href={localePath(locale, "/account")} className="text-steel-700 underline">
+              {dict.account.title}
+            </Link>
+          </p>
+        )}
       </div>
     </Container>
   );

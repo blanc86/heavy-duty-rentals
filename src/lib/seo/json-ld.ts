@@ -1,6 +1,6 @@
 import { env } from "@/lib/env";
 import type { Locale } from "@/lib/i18n/config";
-import { formatMoney, type Halalas } from "@/lib/money";
+import type { Halalas } from "@/lib/money";
 import type { BusinessSettings } from "@/lib/settings";
 
 /**
@@ -226,7 +226,3 @@ export function branchJsonLd(params: {
   };
 }
 
-/** Money for display inside JSON-LD descriptions. */
-export function priceLabel(amount: Halalas, locale: Locale): string {
-  return formatMoney(amount, locale);
-}

@@ -1,9 +1,6 @@
-import { and, eq, sql as raw } from "drizzle-orm";
-import { db, isExclusionViolation } from "@/lib/db";
-import { equipmentClasses } from "@/lib/db/schema/catalog";
-import { reservations } from "@/lib/db/schema/booking";
+import { sql as raw } from "drizzle-orm";
+import { db } from "@/lib/db";
 import type { TstzRange } from "@/lib/db/schema/types";
-import { uuidv7 } from "@/lib/ids";
 
 /**
  * AVAILABILITY.
@@ -219,95 +216,6 @@ export interface HoldResult {
 }
 
 /**
- * Place a time-boxed hold on a specific unit while the customer checks out.
- *
- * The hold participates in the exclusion constraint, so it genuinely blocks
- * other customers rather than merely hinting. If another transaction wins the
- * race, Postgres raises SQLSTATE 23P01 and we surface a clean
- * "no longer available" instead of trying to prevent the race ourselves.
- */
-export async function holdUnit(params: {
-  unitId: string;
-  period: TstzRange;
-  billableStart: Date;
-  billableEnd: Date;
-  holdMinutes: number;
-  heldByToken: string;
-}): Promise<HoldResult> {
-  const expiresAt = new Date(Date.now() + params.holdMinutes * 60_000);
-  const id = uuidv7();
-
-  try {
-    await db.execute(raw`
-      INSERT INTO reservation
-        (id, unit_id, booking_id, status, period, billable_start, billable_end, expires_at, held_by_token)
-      VALUES
-        (${id}, ${params.unitId}, NULL, 'held', ${rangeLiteral(params.period)}::tstzrange,
-         ${params.billableStart.toISOString()}::timestamptz,
-         ${params.billableEnd.toISOString()}::timestamptz,
-         ${expiresAt.toISOString()}::timestamptz,
-         ${params.heldByToken})
-    `);
-  } catch (error) {
-    if (isExclusionViolation(error)) throw new UnitNoLongerAvailableError();
-    throw error;
-  }
-
-  return { reservationId: id, unitId: params.unitId, expiresAt };
-}
-
-/**
- * Find any free unit of a class and hold it, trying candidates in turn.
- *
- * Under contention the first candidate can lose the race to another customer
- * between the read and the insert. Rather than failing, we move to the next
- * candidate — the exclusion violation is expected traffic here, not an error.
- */
-export async function holdAnyAvailableUnit(params: {
-  classId: string;
-  period: TstzRange;
-  billableStart: Date;
-  billableEnd: Date;
-  holdMinutes: number;
-  heldByToken: string;
-  branchId?: string | undefined;
-}): Promise<HoldResult> {
-  const candidates = await findAvailableUnits({
-    classId: params.classId,
-    period: params.period,
-    branchId: params.branchId,
-    limit: 10,
-  });
-
-  if (candidates.length === 0) throw new UnitNoLongerAvailableError();
-
-  for (const candidate of candidates) {
-    try {
-      return await holdUnit({ ...params, unitId: candidate.unitId });
-    } catch (error) {
-      if (error instanceof UnitNoLongerAvailableError) continue;
-      throw error;
-    }
-  }
-
-  throw new UnitNoLongerAvailableError();
-}
-
-/** Release a hold — the customer abandoned checkout or changed their selection. */
-export async function releaseHold(reservationId: string, heldByToken: string): Promise<void> {
-  await db
-    .update(reservations)
-    .set({ status: "released" })
-    .where(
-      and(
-        eq(reservations.id, reservationId),
-        eq(reservations.heldByToken, heldByToken),
-        eq(reservations.status, "held"),
-      ),
-    );
-}
-
-/**
  * Expire stale holds.
  *
  * Housekeeping only. Reads already treat an expired hold as released, so a late
@@ -323,46 +231,6 @@ export async function expireStaleHolds(): Promise<number> {
     RETURNING id
   `);
   return result.length;
-}
-
-/** Fetch the buffer configuration a class needs to compute its occupied window. */
-export async function getClassSchedulingConfig(classId: string): Promise<{
-  mobilisationBufferDays: number;
-  demobilisationBufferDays: number;
-  minRentalDays: number;
-} | null> {
-  const [row] = await db
-    .select({
-      mobilisationBufferDays: equipmentClasses.mobilisationBufferDays,
-      demobilisationBufferDays: equipmentClasses.demobilisationBufferDays,
-      minRentalDays: equipmentClasses.minRentalDays,
-    })
-    .from(equipmentClasses)
-    .where(eq(equipmentClasses.id, classId))
-    .limit(1);
-  return row ?? null;
-}
-
-/** Is this specific unit free for this period? Used when re-validating at commit. */
-export async function isUnitAvailable(unitId: string, period: TstzRange): Promise<boolean> {
-  const rows = await db.execute<{ ok: boolean }>(raw`
-    SELECT NOT EXISTS (
-      SELECT 1 FROM reservation r
-      WHERE r.unit_id = ${unitId}
-        AND r.status IN ('held', 'confirmed', 'active')
-        AND (r.expires_at IS NULL OR r.expires_at > now())
-        AND r.period && ${rangeLiteral(period)}::tstzrange
-    ) AND NOT EXISTS (
-      SELECT 1 FROM unit_blackout ub
-      WHERE ub.unit_id = ${unitId}
-        AND ub.period && ${rangeLiteral(period)}::tstzrange
-    ) AND EXISTS (
-      SELECT 1 FROM equipment_unit u
-      WHERE u.id = ${unitId} AND u.is_active = TRUE
-        AND u.status IN ('available', 'reserved', 'rented', 'in_transit')
-    ) AS ok
-  `);
-  return rows[0]?.ok === true;
 }
 
 export { ACTIVE_RESERVATION_STATUSES };

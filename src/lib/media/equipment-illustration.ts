@@ -388,10 +388,6 @@ function genericMachine(p: Palette): string {
   `;
 }
 
-export function hasIllustration(categorySlug: string): boolean {
-  return categorySlug in MACHINES;
-}
-
 /**
  * Render the illustration for a category.
  *
@@ -439,4 +435,3 @@ export function illustrationUrl(categorySlug: string, locale: "en" | "ar" = "en"
   return `/api/media/illustration/${encodeURIComponent(categorySlug)}?locale=${locale}`;
 }
 
-export const ILLUSTRATED_CATEGORIES = Object.keys(MACHINES);

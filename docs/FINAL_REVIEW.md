@@ -100,7 +100,7 @@ Driving one form found four bugs, so the rest of the application got the same tr
 
 Two fully-implemented, fully-guarded server actions with no way to reach them is a pattern worth naming: the actions had tests and audit trails, so everything that looks at code looked healthy. Only opening the page shows that the button is missing.
 
-**Every registration produced an account nobody could use.** `registerAction` created the user with status `pending_verification`; `resolveSession` grants no actor to a non-active user. So a new customer received a valid session, was redirected to `/account`, was bounced back to sign-in, and looped. Signing in again did not help — login only rejects `suspended`, so it issued another session that also resolved to nothing. There was no escape, because no email verification exists anywhere: `auth_token` is never written to, and there is no mail transport at all. Nothing failed loudly — the row was written, the audit said success, the redirect looked deliberate, every route returned its expected status. The only symptom was a customer who could never get in. Registration now creates the account `active` with `email_verified_at` left null, which is the truth: the account works, the address is unproven. Three integration tests pin the invariant that was violated.
+**Every registration produced an account nobody could use.** `registerAction` created the user with status `pending_verification`; `resolveSession` grants no actor to a non-active user. So a new customer received a valid session, was redirected to `/account`, was bounced back to sign-in, and looped. Signing in again did not help — login only rejects `suspended`, so it issued another session that also resolved to nothing. There was no escape, because no email verification exists anywhere: `auth_token` is never written to, and there is no mail transport at all. Nothing failed loudly — the row was written, the audit said success, the redirect looked deliberate, every route returned its expected status. The only symptom was a customer who could never get in. Registration was fixed to create the account `active` with `email_verified_at` left null, which is the truth: the account works, the address is unproven. **Superseded — see §11: customer registration was later removed entirely, and those three tests with it.**
 
 **All three Arabic guides had never been reachable.** Next.js hands dynamic segments to the page **percent-encoded**, not decoded. ASCII kebab-case slugs encode to themselves, so this is invisible until a slug is non-ASCII — and article slugs are translated rather than transliterated, which is correct for SEO and fatal here. Every Arabic guide arrived as `%D9%85%D8%A7-…`, matched nothing, and 404'd, while the guides index linked to them happily. Fixed with `decodeSlugParam`. Separately, the language switch built `/ar/guides/<english-slug>`, which matches no article; the route now resolves a foreign-locale slug through the translation group and redirects to its counterpart.
 
@@ -395,3 +395,72 @@ The transactional core — availability, pricing, booking, tenancy, audit — is
 The things that are missing are missing because they need a merchant account, a tax advisor, a lawyer, a translator or a penetration tester — not because they were skipped. Every one is named above with a next step, and every one is visible in the running application rather than disguised: the mock provider says it moves no money, invoices say they are not ZATCA-cleared, legal pages say they are drafts, and demo equipment carries a "Demo data" badge.
 
 The single largest gap between this and a production system is not code. It is that nobody qualified has yet reviewed the tax, privacy and consumer-law positions, and nobody adversarial has yet attacked it.
+
+---
+
+## 11. Removing customer accounts
+
+Added after the review above, at the owner's request: *"I would rather have no
+sign up for this website for customers. Some customers may leave due to it."*
+
+That is a correct read of the funnel. A contractor who wants a pump for Tuesday
+is not looking to open an account, and the account was never doing work the
+business needed — identity is checked at handover, and the money is checked by
+the card.
+
+**What changed**
+
+- Checkout takes a name, an email and an optional phone, and requires no
+  session. `findOrCreateGuestCustomer` finds or creates a `user` row keyed on
+  the email, so `booking.customer_user_id` stays NOT NULL and every scoped read
+  in the codebase works unchanged.
+- `/register` and `registerAction` are gone. A `"use server"` export is a
+  callable HTTP endpoint whether or not a page links to it, so leaving the
+  action behind an unlinked route would have been worse than either option.
+- `/[locale]/booking` is the customer's way back in: a reference plus the email
+  it was booked with mints a session scoped to that one booking.
+- `/login` is now framed as staff sign-in and moved to the footer. The header's
+  anonymous slot says "My booking".
+- `/admin/customers` answers "who has hired from us", which a list of
+  registrations used to answer and no longer can.
+
+**What this cost, stated plainly**
+
+There is now no way to create an account at all. Company and procurement
+features — PO numbers, cost centres, consolidated invoicing — still work for
+accounts that exist, but those have to be seeded. An admin screen that creates
+one was considered and **not** built: onboarding an account holder securely
+needs a set-your-password link delivered to a proven address, and there is no
+email transport (§3). The alternative is an admin typing a password and relaying
+it out of band, which hands a real credential around in plaintext. When the
+email transport lands, that is the flow to build.
+
+**Two vulnerabilities this design introduced, both closed before it shipped**
+
+*Confused deputy via checkout email.* Anyone can type any email at checkout. If
+that address already had a real account, the booking attached to that user id —
+and the guest lookup would then have handed a stranger a session carrying the
+account holder's identity. `resolveGuestBooking` now requires `is_guest = TRUE`,
+and checkout mints a scoped session only when the resolved customer record is
+actually a guest. The account holder signs in normally and sees the booking.
+
+*Scoped sessions roaming.* A booking-scoped session carries a real user id, so
+it had to be barred from everything except the one booking. Rather than
+remembering that at each call site, the rule lives in `guard()` — refused by
+default, opted into only by cancellation — and in `getFullActor()`, which pages
+use instead of `getActor()`. Both are subtractive: they run after the existing
+authorization checks and can only narrow what those allowed.
+
+**Verification after the change**
+
+167 unit and integration tests (6 new, covering scoped-session isolation, the
+lookup refusing real accounts, and the two CHECK constraints), 37 flow checks,
+12 MFA checks, 56 pen-test controls (5 new, probing guest access specifically),
+all routes and 120 internal links resolving, 36 accessibility renders clean, and
+a walked end-to-end guest booking: search, book, pay, land on the confirmed
+rental, with a second booking of the same customer returning 404 and
+`/account`, `/account/security` and `/admin` all refused.
+
+**One honesty fix found while testing.** The confirmation page said "We have
+sent the details to your email." There is no email transport, and the reference
+is now the only way back into a booking. It now says to save the reference.

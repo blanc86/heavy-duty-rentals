@@ -9,14 +9,6 @@ export function getDictionary(locale: Locale): Dictionary {
 }
 
 /**
- * Resolve a locale from a URL segment, falling back rather than throwing —
- * a bad segment should render the English page, not a 500.
- */
-export function resolveLocale(value: string | undefined): Locale {
-  return value && isLocale(value) ? value : DEFAULT_LOCALE;
-}
-
-/**
  * Interpolate {placeholders}. Deliberately minimal: no expression evaluation,
  * so a translated string can never execute anything.
  */

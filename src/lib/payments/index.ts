@@ -27,11 +27,6 @@ export function getPaymentProvider(): PaymentProvider {
   return instance;
 }
 
-/** Test seam. */
-export function __setPaymentProvider(provider: PaymentProvider | null): void {
-  instance = provider;
-}
-
 export * from "./types";
 export { MockPaymentProvider } from "./mock-provider";
 export { MoyasarProvider } from "./moyasar-provider";

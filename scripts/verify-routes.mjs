@@ -132,7 +132,9 @@ async function main() {
     "/legal/privacy",
     "/login",
     "/quote",
-    "/register",
+    // "/register" is intentionally absent: customers have no accounts. The
+    // pen test asserts it 404s, which is the check that matters.
+    "/booking",
     "/safety",
   ];
 
@@ -140,6 +142,7 @@ async function main() {
     "/account",
     "/account/security",
     "/admin",
+    "/admin/customers",
     "/admin/audit",
     "/admin/bookings",
     "/admin/quotes",

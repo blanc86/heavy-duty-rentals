@@ -60,6 +60,11 @@ export function SiteFooter({
         // the support surface, and it is already listed directly above, so the
         // duplicate entry is gone rather than repointed at the same URL.
         { href: "/contact", label: dict.nav.contact },
+        { href: "/booking", label: dict.booking.lookupTitle },
+        // Staff sign-in lives here and only here. It is not a customer
+        // destination, and putting it in the header invited people without
+        // accounts to hunt for a password they were never issued.
+        { href: "/login", label: dict.auth.staffSignIn },
       ],
     },
     {

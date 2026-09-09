@@ -82,7 +82,9 @@ async function main() {
     "/for-contractors",
     "/quote",
     "/login",
-    "/register",
+    // The booking lookup replaced customer registration; it is the page a
+    // customer with a rental actually lands on, so it is the one audited.
+    "/booking",
     "/contact",
     "/faq",
   ].filter(Boolean);

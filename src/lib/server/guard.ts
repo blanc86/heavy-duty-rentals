@@ -42,6 +42,20 @@ export interface GuardOptions<TSchema extends z.ZodType> {
   requireCompanyPermission?: { permission: Permission; companyId: string };
   /** Require the session to have satisfied MFA (mandatory for admin actions). */
   requireMfa?: boolean;
+  /**
+   * Permit a BOOKING-SCOPED session (a guest who proved they hold a reference
+   * and the email it was booked with).
+   *
+   * Off by default, and deliberately opt-IN: such a session must reach only
+   * the handful of actions that operate on the one booking it names. The
+   * default matters because guest checkout attaches a booking to whatever user
+   * row owns that email — which can be a REAL account if someone books using
+   * an address that already has one. A scoped session therefore carries a
+   * `userId` that is not necessarily the visitor's, so letting it change a
+   * password or a profile would be account takeover. It is refused everywhere
+   * unless the action says otherwise.
+   */
+  allowScopedSession?: boolean;
   rateLimit?: { name: RateLimitName; identifier?: string };
   /** Skip the origin check. ONLY for provider webhooks, which authenticate by signature. */
   skipCsrf?: boolean;
@@ -158,6 +172,15 @@ export async function guard<TSchema extends z.ZodType, TResult>(
 
     if (options.requireMfa && actor && !actor.mfaSatisfied) {
       throw new AuthorizationError("Two-factor authentication is required for this action.");
+    }
+
+    // A booking-scoped session is refused unless this action opted in. Placed
+    // AFTER the other authorization checks so it can only ever subtract from
+    // what they allowed, never add to it.
+    if (actor?.scopedBookingId && !options.allowScopedSession) {
+      throw new AuthorizationError(
+        "Please sign in to do that. Looking up a booking gives access to that booking only.",
+      );
     }
 
     // --- 5. Validate -------------------------------------------------------

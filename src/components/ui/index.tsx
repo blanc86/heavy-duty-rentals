@@ -87,12 +87,6 @@ export function CardBody({ className, ...props }: ComponentProps<"div">) {
   return <div className={cn("p-4 sm:p-5", className)} {...props} />;
 }
 
-export function CardHeader({ className, ...props }: ComponentProps<"div">) {
-  return (
-    <div className={cn("border-b border-steel-200 px-4 py-3 sm:px-5", className)} {...props} />
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Badge — status only, never decoration
 // ---------------------------------------------------------------------------

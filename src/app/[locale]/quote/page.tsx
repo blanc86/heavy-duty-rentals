@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { QuoteRequestForm } from "@/components/booking/quote-request-form";
 import { Alert, Card, CardBody, Container, SectionHeading } from "@/components/ui";
-import { getActor } from "@/lib/auth/session";
+import { getFullActor } from "@/lib/auth/session";
 import { getClassBySlug, listBranches, searchClasses } from "@/lib/catalog/repository";
 import { getDictionary } from "@/lib/i18n";
 import { isLocale, type Locale } from "@/lib/i18n/config";
@@ -52,7 +52,7 @@ export default async function QuotePage({
     classSlug ? getClassBySlug(classSlug, locale) : Promise.resolve(null),
     listBranches(locale),
     searchClasses({ locale, perPage: 48 }),
-    getActor(),
+    getFullActor(),
   ]);
 
   return (

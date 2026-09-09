@@ -103,11 +103,15 @@ export function SiteHeader({
               </div>
             </>
           ) : (
+            /* Not "Sign in": customers have no accounts. The only thing an
+               anonymous visitor could want here is the rental they already
+               booked, so that is what the link says and does. Staff reach
+               /login from the footer, which is where they will look. */
             <Link
-              href={localePath(locale, "/login")}
+              href={localePath(locale, "/booking")}
               className="hidden rounded-[--radius-control] px-3 py-2 text-sm font-medium text-steel-700 hover:bg-steel-100 sm:block"
             >
-              {dict.nav.login}
+              {dict.nav.myBooking}
             </Link>
           )}
 
@@ -124,8 +128,8 @@ export function SiteHeader({
           <MobileNav
             locale={locale}
             items={nav}
-            accountLabel={actor ? dict.nav.dashboard : dict.nav.login}
-            accountHref={localePath(locale, actor ? "/account" : "/login")}
+            accountLabel={actor ? dict.nav.dashboard : dict.nav.myBooking}
+            accountHref={localePath(locale, actor ? "/account" : "/booking")}
             openLabel={dict.a11y.openMenu}
             closeLabel={dict.common.close}
             menuLabel={dict.nav.menu}

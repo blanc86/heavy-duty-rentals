@@ -1,4 +1,4 @@
-import { and, eq, sql as raw } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, isUniqueViolation } from "@/lib/db";
 import { bookings } from "@/lib/db/schema/booking";
 import { payments, paymentWebhookEvents, refunds } from "@/lib/db/schema/finance";
@@ -343,16 +343,6 @@ export async function recordUnverifiedWebhook(
     outcome: "denied",
     metadata: { provider: providerName, reason },
   });
-}
-
-/** Total captured against a booking, for display and reconciliation. */
-export async function capturedTotal(bookingId: string): Promise<Halalas> {
-  const rows = await db.execute<{ total: string | null }>(raw`
-    SELECT COALESCE(SUM(captured_halalas), 0)::text AS total
-    FROM payment
-    WHERE booking_id = ${bookingId} AND status IN ('captured', 'partially_refunded')
-  `);
-  return BigInt(rows[0]?.total ?? "0");
 }
 
 /**

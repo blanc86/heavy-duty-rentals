@@ -41,6 +41,43 @@
 
 ## 2. Authentication
 
+### Who authenticates
+
+**Customers do not.** There is no registration endpoint and `/register` returns
+404. A booking is made as a guest and reopened with its reference plus the email
+it was booked with. The `user` row behind a guest booking carries
+`is_guest = TRUE` and a `password_hash` that is not PHC format, so Argon2
+verification cannot match it — the row exists for ownership scoping and cannot
+sign in by construction. A database CHECK constraint forbids
+`is_guest AND is_platform_admin`.
+
+The password machinery below therefore protects **staff and business accounts**.
+
+### Booking-scoped sessions
+
+A reference + email match mints a session with `session.scoped_booking_id` set.
+It is a deliberately weak credential and is confined accordingly:
+
+- 4-hour TTL for both sliding and absolute expiry (not 30/90 days).
+- `scopeFor` narrows every booking read to that one booking id — not to the
+  other bookings the same address has made. Checked first and returned
+  immediately, so no later branch can widen it.
+- `guard()` refuses it unless the action sets `allowScopedSession`. Only
+  cancellation does. The check runs after the other authorization checks, so it
+  can only subtract from what they allowed.
+- `getFullActor()` returns null for it, so account and admin pages reject it.
+- A database CHECK forbids `scoped_booking_id` together with `mfa_satisfied_at`:
+  a scoped session must never look like a second factor was cleared.
+- Rate limited under the `login` bucket, because it is a guessing surface.
+
+**Confused-deputy defence.** Anyone can type any email at checkout, so a booking
+may attach to a `user` row that belongs to a real account holder.
+`resolveGuestBooking` requires `is_guest = TRUE`, and checkout mints a scoped
+session only when the resolved customer record is a guest. Without both, a
+stranger could book with a staff address and receive a session carrying that
+staff member's user id — narrow in what it reads, but wrong in whose name it
+acts, and corrupting the audit trail.
+
 ### Passwords
 - **argon2id** (`@node-rs/argon2`), memory-hard parameters (m=19456 KiB, t=2, p=1 — the OWASP baseline), unique per-user salt.
 - Minimum 12 characters. **Length is the requirement; composition rules are not enforced** — they push users toward `Password1!` and measurably reduce entropy.
@@ -58,21 +95,21 @@
 - **TOTP** (RFC 6238), 30s window, ±1 step drift tolerance, secret encrypted at rest.
 - **Replay-protected:** `lastUsedCounter` rejects reuse of a code inside its own window.
 - Single-use recovery codes, stored hashed.
-- **Mandatory for platform admins.** Optional but promoted for customers.
+- **Mandatory for platform admins.** Available to business accounts; guests have no account to enrol.
 - **[NOT IMPLEMENTED]** WebAuthn/passkeys — designed for, not built.
 
 ### Brute force and enumeration
 | Endpoint | Limit |
 |---|---|
 | Login | 5 / 15 min per (IP + email), 20 / hour per IP |
-| Registration | 3 / hour per IP |
+| Booking lookup (reference + email) | shares the `login` bucket |
 | Password reset request | 3 / hour per email, 10 / hour per IP |
 | MFA verification | 5 / 10 min per user, then step-up lockout |
 | Coupon validation | 10 / min per session |
 | Booking creation | 10 / hour per user |
 
 - Progressive account lockout with a time decay (`failedLoginCount` + `lockedUntil`).
-- **Uniform responses**: login, registration, and password reset return the same message and comparable timing regardless of whether the account exists.
+- **Uniform responses**: login and password reset return the same message and comparable timing regardless of whether the account exists. The booking lookup returns ONE message for a bad reference, a wrong email, and a booking owned by a real account — so it cannot be used as an oracle for which references exist.
 - Verification and reset tokens: 256-bit random, stored hashed, single-use, 1-hour TTL, invalidated on password change.
 
 ---

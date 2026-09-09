@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { ChangePassword } from "@/components/auth/change-password";
 import { MfaSetup } from "@/components/auth/mfa-setup";
 import { Card, CardBody, Container, SectionHeading } from "@/components/ui";
-import { getActor } from "@/lib/auth/session";
+import { getFullActor } from "@/lib/auth/session";
 import { getMfaStatus } from "@/lib/auth/mfa-actions";
 import { getDictionary } from "@/lib/i18n";
 import { formatDate, isLocale, localePath, type Locale } from "@/lib/i18n/config";
@@ -26,7 +26,7 @@ export default async function SecurityPage({ params }: { params: Promise<{ local
   const dict = getDictionary(locale);
   const isArabic = locale === "ar";
 
-  const actor = await getActor();
+  const actor = await getFullActor();
   if (!actor) {
     redirect(
       localePath(locale, `/login?next=${encodeURIComponent(`/${locale}/account/security`)}`),

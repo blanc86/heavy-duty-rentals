@@ -45,7 +45,8 @@ export default async function InvoicePage({
   const actor = await getActor();
   if (!actor) {
     redirect(
-      localePath(locale, `/login?next=${encodeURIComponent(`/${locale}/booking/${reference}/invoice`)}`),
+      // See the booking detail page: guests return via reference + email.
+      localePath(locale, `/booking?ref=${encodeURIComponent(reference)}`),
     );
   }
 

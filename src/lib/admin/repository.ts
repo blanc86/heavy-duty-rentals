@@ -343,6 +343,99 @@ export async function listAdminBookings(params: {
   }));
 }
 
+export interface AdminCustomerRow {
+  userId: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  isGuest: boolean;
+  companyName: string | null;
+  bookingCount: number;
+  cancelledCount: number;
+  /**
+   * Subtotal + VAT across bookings that were actually paid for. Deposits are
+   * excluded because they are refundable and were never revenue; counting them
+   * would overstate what every customer is worth.
+   */
+  lifetimeChargedHalalas: Halalas;
+  firstBookedAt: Date;
+  lastBookedAt: Date;
+}
+
+/**
+ * Who has hired from us.
+ *
+ * Grouped by customer record rather than by booking, because the question an
+ * owner actually asks is "who are my repeat customers and what are they worth",
+ * and a booking list cannot answer it.
+ *
+ * Since checkout no longer requires an account, most rows here are guests — a
+ * `user` row created from the email typed at checkout, which is what makes
+ * repeat business visible at all. Two bookings from one address group into one
+ * row; two addresses stay two customers, and no amount of joining fixes that
+ * honestly, so the page does not pretend otherwise.
+ */
+export async function listAdminCustomers(params: {
+  search?: string | undefined;
+  limit?: number;
+}): Promise<AdminCustomerRow[]> {
+  const { search, limit = 100 } = params;
+
+  const rows = await db.execute<{
+    user_id: string;
+    full_name: string;
+    email: string;
+    phone: string | null;
+    is_guest: boolean;
+    company_name: string | null;
+    booking_count: string;
+    cancelled_count: string;
+    lifetime_charged_halalas: string;
+    first_booked_at: string;
+    last_booked_at: string;
+  }>(raw`
+    SELECT u.id AS user_id, u.full_name, u.email, u.phone, u.is_guest,
+           MAX(c.name_en) AS company_name,
+           COUNT(*)::text AS booking_count,
+           COUNT(*) FILTER (WHERE b.status = 'cancelled')::text AS cancelled_count,
+           COALESCE(SUM(b.taxable_subtotal_halalas + b.vat_halalas)
+                    FILTER (WHERE b.status IN ('confirmed', 'active', 'completed')), 0)::text
+             AS lifetime_charged_halalas,
+           MIN(b.created_at)::text AS first_booked_at,
+           MAX(b.created_at)::text AS last_booked_at
+    FROM booking b
+    JOIN "user" u ON u.id = b.customer_user_id
+    LEFT JOIN company c ON c.id = b.company_id
+    -- Only people who have actually booked. A user row with no rental is not a
+    -- customer, and listing one would make the page a directory of addresses.
+    WHERE TRUE
+      ${
+        search
+          ? raw`AND (u.full_name ILIKE ${"%" + search + "%"}
+                  OR u.email ILIKE ${"%" + search + "%"}
+                  OR u.phone ILIKE ${"%" + search + "%"})`
+          : raw``
+      }
+    GROUP BY u.id, u.full_name, u.email, u.phone, u.is_guest
+    ORDER BY MAX(b.created_at) DESC
+    LIMIT ${limit}
+  `);
+
+  return rows.map((r) => ({
+    userId: r.user_id,
+    fullName: r.full_name,
+    email: r.email,
+    phone: r.phone,
+    isGuest: r.is_guest,
+    companyName: r.company_name,
+    bookingCount: Number(r.booking_count),
+    cancelledCount: Number(r.cancelled_count),
+    lifetimeChargedHalalas: BigInt(r.lifetime_charged_halalas),
+    firstBookedAt: parseTimestamp(r.first_booked_at),
+    lastBookedAt: parseTimestamp(r.last_booked_at),
+  }));
+}
+
 export interface AdminUnitRow {
   id: string;
   assetCode: string;

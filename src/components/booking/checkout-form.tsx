@@ -65,6 +65,7 @@ export function CheckoutForm({
   config,
   idempotencyKey,
   companies,
+  knownCustomer,
   termsVersion,
   termsHref,
 }: {
@@ -73,6 +74,8 @@ export function CheckoutForm({
   config: CheckoutConfig;
   idempotencyKey: string;
   companies: { id: string; name: string }[];
+  /** Prefill for a signed-in booker. Null for a guest, which is the norm. */
+  knownCustomer: { name: string; email: string } | null;
   termsVersion: string;
   termsHref: string;
 }) {
@@ -148,6 +151,12 @@ export function CheckoutForm({
         ...(config.deliveryRequired ? { deliveryDistanceKm: config.deliveryDistanceKm } : {}),
         ...(config.couponCode ? { couponCode: config.couponCode } : {}),
 
+        customerName: String(formData.get("customerName") ?? ""),
+        customerEmail: String(formData.get("customerEmail") ?? ""),
+        ...(formData.get("customerPhone")
+          ? { customerPhone: String(formData.get("customerPhone")) }
+          : {}),
+
         siteCity: String(formData.get("siteCity") ?? ""),
         siteAddressLine: String(formData.get("siteAddressLine") ?? ""),
         siteContactName: String(formData.get("siteContactName") ?? ""),
@@ -182,6 +191,67 @@ export function CheckoutForm({
   return (
     <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[1fr_22rem]" noValidate>
       <div className="space-y-6">
+        {/* --- Step: who is booking ----------------------------------------
+            First, because it is the least effort and establishes the identity
+            everything else hangs off. No account is created that the customer
+            has to think about: the email here is simply how they find this
+            booking again. Said plainly under the field, because an email box
+            on a checkout page otherwise reads as the start of a signup.
+        ------------------------------------------------------------------ */}
+        <Card>
+          <CardBody>
+            <h2 className="mb-4 text-lg font-bold text-steel-950">{dict.booking.yourDetails}</h2>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label htmlFor="customerName" required>
+                  {dict.auth.fullName}
+                </Label>
+                <Input
+                  id="customerName"
+                  name="customerName"
+                  autoComplete="name"
+                  defaultValue={knownCustomer?.name ?? ""}
+                  required
+                  aria-invalid={Boolean(issueFor("customerName"))}
+                />
+                <FieldError>{issueFor("customerName")}</FieldError>
+              </div>
+
+              <div>
+                <Label htmlFor="customerPhone">{dict.auth.phone}</Label>
+                <Input
+                  id="customerPhone"
+                  name="customerPhone"
+                  type="tel"
+                  dir="ltr"
+                  autoComplete="tel"
+                  aria-invalid={Boolean(issueFor("customerPhone"))}
+                />
+                <FieldError>{issueFor("customerPhone")}</FieldError>
+              </div>
+
+              <div className="sm:col-span-2">
+                <Label htmlFor="customerEmail" required>
+                  {dict.auth.email}
+                </Label>
+                <Input
+                  id="customerEmail"
+                  name="customerEmail"
+                  type="email"
+                  dir="ltr"
+                  autoComplete="email"
+                  defaultValue={knownCustomer?.email ?? ""}
+                  required
+                  aria-invalid={Boolean(issueFor("customerEmail"))}
+                />
+                <Hint>{dict.booking.emailPurpose}</Hint>
+                <FieldError>{issueFor("customerEmail")}</FieldError>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
         {/* --- Step: site ------------------------------------------------- */}
         <Card>
           <CardBody>
@@ -255,7 +325,7 @@ export function CheckoutForm({
         {companies.length > 0 && (
           <Card>
             <CardBody>
-              <h2 className="mb-4 text-lg font-bold text-steel-950">{dict.booking.yourDetails}</h2>
+              <h2 className="mb-4 text-lg font-bold text-steel-950">{dict.booking.billingDetails}</h2>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="sm:col-span-2">

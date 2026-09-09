@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { CheckoutForm, type CheckoutConfig } from "@/components/booking/checkout-form";
 import { Container } from "@/components/ui";
-import { getActor } from "@/lib/auth/session";
+import { getFullActor } from "@/lib/auth/session";
 import { getClassBySlug, listBranches } from "@/lib/catalog/repository";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema/identity";
@@ -58,23 +58,22 @@ export default async function CheckoutPage({
   }
 
   /**
-   * Authentication is required HERE and not earlier.
+   * NO SIGN-IN GATE. Deliberately.
    *
-   * Search, filters, availability and the full price breakdown all work
-   * anonymously. An account is asked for at the point where it is justified —
-   * we are about to take money and create a contract.
+   * This used to redirect to /login before a customer could check out. That
+   * gate cost bookings and bought nothing: the account it forced was empty by
+   * the time it was created, and the identity that actually matters is checked
+   * at machine handover while the money is checked by the card.
+   *
+   * The checkout collects a name, an email and a phone number instead, which
+   * the depot needs anyway. A customer record is created behind the scenes,
+   * keyed on that email, so ownership scoping and repeat-customer grouping in
+   * the operations console work exactly as they did.
+   *
+   * An actor MAY still be present — staff, or a company member booking on
+   * account — and the form adapts when there is one.
    */
-  const actor = await getActor();
-  if (!actor) {
-    const next = encodeURIComponent(
-      `/${locale}/book/${slug}?${new URLSearchParams(
-        Object.entries(sp).flatMap(([k, v]) =>
-          v === undefined ? [] : [[k, Array.isArray(v) ? (v[0] ?? "") : v]],
-        ),
-      ).toString()}`,
-    );
-    redirect(localePath(locale, `/login?next=${next}`));
-  }
+  const actor = await getFullActor();
 
   // Dates come from the URL so the configuration survives the login round-trip.
   const today = new Date();
@@ -104,7 +103,9 @@ export default async function CheckoutPage({
 
   // Companies the actor is genuinely a member of. Read from the SESSION, so
   // the dropdown cannot be used to reach another tenant.
-  const memberCompanyIds = actor.memberships.map((m) => m.companyId);
+  // A guest has no memberships, so this is empty and the form omits the
+  // company section entirely.
+  const memberCompanyIds = actor?.memberships.map((m) => m.companyId) ?? [];
   const memberCompanies =
     memberCompanyIds.length > 0
       ? await db
@@ -146,6 +147,10 @@ export default async function CheckoutPage({
           id: c.id,
           name: (locale === "ar" ? c.nameAr : c.nameEn) ?? c.nameEn,
         }))}
+        // Prefills for a signed-in booker; a guest types their own.
+        knownCustomer={
+          actor ? { name: actor.fullName, email: actor.email } : null
+        }
         termsVersion={business.termsVersion}
         termsHref={localePath(locale, "/legal/rental-terms")}
       />

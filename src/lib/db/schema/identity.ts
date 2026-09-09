@@ -40,6 +40,11 @@ export const users = pgTable(
      * that no company-scoped route can escalate a customer to platform admin.
      */
     isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
+    /**
+     * Created by a guest checkout. Has no usable password and cannot sign in;
+     * reaches its own booking through a reference + email lookup instead.
+     */
+    isGuest: boolean("is_guest").notNull().default(false),
     status: userStatusEnum("status").notNull().default("pending_verification"),
     failedLoginCount: integer("failed_login_count").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
@@ -82,6 +87,11 @@ export const sessions = pgTable(
     userAgent: varchar("user_agent", { length: 512 }),
     /** Set when MFA was satisfied for this session; admin routes require it. */
     mfaSatisfiedAt: timestamp("mfa_satisfied_at", { withTimezone: true }),
+    /**
+     * When set, this session may see only this one booking. Issued by the guest
+     * reference + email lookup; NULL for a normal staff session.
+     */
+    scopedBookingId: uuid("scoped_booking_id"),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: now(),
   },

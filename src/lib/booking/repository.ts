@@ -45,6 +45,13 @@ export interface BookingSummary {
  * from a request parameter.
  */
 function scopeFor(actor: AuthenticatedActor) {
+  // A booking-scoped session sees ONE booking and nothing else — not even the
+  // other bookings made by the same email address. A guest proved they hold a
+  // specific reference; that is what it unlocks.
+  //
+  // Checked FIRST and returned immediately, so no later branch can widen it.
+  if (actor.scopedBookingId) return eq(bookings.id, actor.scopedBookingId);
+
   const companyIds = accessibleCompanyIds(actor);
   return companyIds.length > 0
     ? or(eq(bookings.customerUserId, actor.userId), inArray(bookings.companyId, companyIds))

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
-import { getActor } from "@/lib/auth/session";
+import { getFullActor } from "@/lib/auth/session";
 import { env } from "@/lib/env";
 import { getDictionary } from "@/lib/i18n";
 import { LOCALE_CONFIG, LOCALES, isLocale, type Locale } from "@/lib/i18n/config";
@@ -72,7 +72,7 @@ export default async function LocaleLayout({
   const dict = getDictionary(locale);
   const config = LOCALE_CONFIG[locale];
   const [actor, business, requestHeaders] = await Promise.all([
-    getActor(),
+    getFullActor(),
     getBusinessSettings(),
     headers(),
   ]);

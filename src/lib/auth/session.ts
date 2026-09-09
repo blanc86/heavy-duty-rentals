@@ -26,6 +26,16 @@ export interface AuthenticatedActor {
   mfaEnrolled: boolean;
   /** Active company memberships. THE tenancy fact; never taken from a request. */
   memberships: { companyId: string; role: CompanyRole }[];
+  /**
+   * Set when this session exists only to view ONE booking — a guest who proved
+   * ownership with a reference and the email it was made with.
+   *
+   * Every booking read narrows to this id when it is present. Without that,
+   * one reference plus one email would open every booking that address ever
+   * made; the reference is the secret, and it should unlock exactly what it
+   * names.
+   */
+  scopedBookingId: string | null;
 }
 
 export type CompanyRole =
@@ -48,11 +58,24 @@ export async function createSession(params: {
   ipAddress?: string | undefined;
   userAgent?: string | undefined;
   mfaSatisfied?: boolean;
+  /**
+   * Restrict this session to a single booking — a guest who proved they hold a
+   * reference and the email it was made with. Such a session lives for HOURS,
+   * not the usual thirty days: it exists to look at one rental, often on a
+   * shared site-office machine, and a month-long token for that is a liability
+   * with no upside.
+   */
+  scopedBookingId?: string | undefined;
 }): Promise<{ token: string; expiresAt: Date }> {
   const token = generateToken();
   const now = Date.now();
-  const expiresAt = new Date(now + env.SESSION_TTL_SECONDS * 1000);
-  const absoluteExpiresAt = new Date(now + env.SESSION_ABSOLUTE_TTL_SECONDS * 1000);
+  const guestTtlMs = 4 * 60 * 60 * 1000;
+  const expiresAt = params.scopedBookingId
+    ? new Date(now + guestTtlMs)
+    : new Date(now + env.SESSION_TTL_SECONDS * 1000);
+  const absoluteExpiresAt = params.scopedBookingId
+    ? new Date(now + guestTtlMs)
+    : new Date(now + env.SESSION_ABSOLUTE_TTL_SECONDS * 1000);
 
   await db.insert(sessions).values({
     id: uuidv7(),
@@ -60,6 +83,7 @@ export async function createSession(params: {
     tokenHash: hashToken(token),
     expiresAt,
     absoluteExpiresAt,
+    scopedBookingId: params.scopedBookingId ?? null,
     ipAddress: params.ipAddress ?? null,
     userAgent: params.userAgent?.slice(0, 512) ?? null,
     mfaSatisfiedAt: params.mfaSatisfied ? new Date() : null,
@@ -88,6 +112,7 @@ interface ResolvedSession {
   row: {
     sessionId: string;
     mfaSatisfiedAt: Date | null;
+    scopedBookingId: string | null;
     expiresAt: Date;
     userId: string;
     email: string;
@@ -117,6 +142,7 @@ async function resolveSession(): Promise<ResolvedSession | null> {
     .select({
       sessionId: sessions.id,
       mfaSatisfiedAt: sessions.mfaSatisfiedAt,
+      scopedBookingId: sessions.scopedBookingId,
       expiresAt: sessions.expiresAt,
       userId: users.id,
       email: users.email,
@@ -204,9 +230,28 @@ export async function getActor(): Promise<AuthenticatedActor | null> {
     isPlatformAdmin: row.isPlatformAdmin,
     sessionId: row.sessionId,
     mfaSatisfied: row.mfaSatisfiedAt !== null,
+    scopedBookingId: row.scopedBookingId,
     mfaEnrolled,
     memberships,
   };
+}
+
+/**
+ * The actor, but only if this is a FULL session.
+ *
+ * A booking-scoped guest session is not one: it exists to view a single rental
+ * and must not reach account settings, the admin console, or anything else that
+ * acts on behalf of the user id it carries. Server Actions get this rule from
+ * `guard`; pages have no guard, so they call this instead of `getActor`.
+ *
+ * The pairing is deliberate — a page that wants "someone is signed in" almost
+ * always means "signed in properly", and this makes that the shorter thing to
+ * write.
+ */
+export async function getFullActor(): Promise<AuthenticatedActor | null> {
+  const actor = await getActor();
+  if (!actor || actor.scopedBookingId) return null;
+  return actor;
 }
 
 /**

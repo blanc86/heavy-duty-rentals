@@ -16,9 +16,10 @@ moves through them, and which parts will bite you.
 ## 1. The one-paragraph version
 
 A customer searches equipment, picks dates, sees a real price and real
-availability, and books and pays online. A depot operator then runs the rental
-from an admin console: machine out, machine back, cancellations, taking a broken
-crane off the market. Everything is bilingual English/Arabic with full RTL.
+availability, and books and pays online — **without creating an account**. A
+depot operator then runs the rental from an admin console: machine out, machine
+back, cancellations, taking a broken crane off the market. Everything is
+bilingual English/Arabic with full RTL.
 
 The two things the whole system is built around are that **a machine can never
 be double-booked** and that **a price shown is a price honoured**. Both are
@@ -152,6 +153,60 @@ no evidence if bypassed.
 
 ---
 
+## 4a. Who can sign in, and who cannot
+
+**Customers have no accounts.** There is no registration page and no
+`registerAction`; `/register` returns 404 and the pen test asserts that it
+does. Requiring a signup before a contractor can hire a machine cost bookings
+and was never doing work the business needed — identity is checked at handover,
+and the money is checked by the card.
+
+A guest checkout still writes a `user` row, found or created by email
+(`lib/booking/guest.ts`). That is what keeps `booking.customer_user_id` NOT
+NULL, keeps every scoped read unchanged, and makes repeat business visible in
+the admin console. The row carries `is_guest = TRUE` and a `password_hash` that
+is not PHC format, so Argon2 verification cannot match it: the row exists but
+cannot authenticate.
+
+**Customers come back with a reference and an email.** `/[locale]/booking` is
+the lookup form. A match mints a session with `session.scoped_booking_id` set,
+and three things follow from that column:
+
+| Where | Effect |
+|---|---|
+| `scopeFor` in `booking/repository.ts` | narrows every booking read to that one id, checked first and returned immediately so no later branch can widen it |
+| `guard()` | refuses the session entirely unless the action passes `allowScopedSession` — only cancellation does |
+| `getFullActor()` | returns null for it, so pages that mean "signed in properly" (account, admin) reject it without each remembering to |
+
+The session lives four hours, not thirty days. It exists to look at one rental,
+often on a shared site-office machine.
+
+**Two traps this design has, both closed:**
+
+Anyone can type any email at checkout. If that address already has a real
+account, the booking attaches to *that* user id. So `resolveGuestBooking`
+requires `is_guest = TRUE` — otherwise a stranger could book using a staff
+address and then "look up" their own reference to receive a session carrying
+that staff member's identity. For the same reason the checkout mints a session
+only when `customer.isGuest`, never merely when nobody is signed in.
+
+The lookup returns one message for every failure — no such reference, wrong
+email, and "that address has an account, so sign in instead" are
+indistinguishable. The sign-in sentence appears in all three cases, so it
+guides an account holder out of a dead end without telling anyone else which
+case they hit.
+
+**`/login` is for staff and business accounts**, linked from the footer, not the
+header. The header's anonymous slot says "My booking" and points at the lookup.
+
+There is no admin screen that creates an account either, and that is deliberate
+rather than missing: onboarding an account holder securely needs a way to
+deliver a set-your-password link to a proven address, and this deployment has no
+email transport. An admin typing a password and relaying it out of band hands a
+real credential around in plaintext, so it is not offered.
+
+---
+
 ## 5. The booking lifecycle
 
 ```
@@ -232,7 +287,7 @@ node scripts/fetch-demo-images.mjs   # optional: freely-licensed demo photograph
 npm run dev
 ```
 
-Sign in with `admin@example.com` / `customer@example.com` and the seed password
+Sign in with `admin@example.com` (staff console) and the seed password
 from `.env`. All equipment is fictional demo data and is flagged as such in the
 UI.
 

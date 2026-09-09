@@ -9,6 +9,8 @@ import { parseHalalas } from "@/lib/money";
 import { refundRentalCharge, startPayment } from "@/lib/payments/service";
 import { quote } from "@/lib/pricing/repository";
 import { getBookingForActor } from "@/lib/booking/repository";
+import { findOrCreateGuestCustomer, resolveGuestBooking } from "@/lib/booking/guest";
+import { createSession, setSessionCookie } from "@/lib/auth/session";
 import {
   createBooking,
   expireAbandonedCheckouts,
@@ -55,6 +57,14 @@ const createBookingSchema = z
     deliveryDistanceKm: z.number().int().min(0).max(3000).optional(),
     couponCode: z.string().max(40).optional(),
 
+    // WHO IS BOOKING. Previously taken from the signed-in account; customers
+    // no longer have one, so the checkout collects it. These are the details
+    // the depot will actually call, and the email the customer will use to
+    // find this booking again.
+    customerName: z.string().min(2).max(200).trim(),
+    customerEmail: z.email().max(320),
+    customerPhone: z.string().min(6).max(32).trim().optional(),
+
     siteCity: z.string().min(2).max(80).trim(),
     siteAddressLine: z.string().min(5).max(500).trim(),
     siteContactName: z.string().min(2).max(160).trim(),
@@ -90,13 +100,16 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
       input,
       {
         schema: createBookingSchema,
-        requireAuth: true,
+        // NO ACCOUNT REQUIRED. Making a contractor register before they can
+        // hire a machine costs bookings, and the account was never doing work
+        // the business needed — identity is checked at handover and the money
+        // is checked by the card. A `user` row is still created behind the
+        // scenes, keyed on email, so ownership scoping and repeat-customer
+        // grouping work exactly as before.
         rateLimit: { name: "bookingCreate" },
         audit: { action: "booking.create_attempt", resourceType: "booking" },
       },
       async ({ input: data, actor: maybeActor, ip }) => {
-        const actor = requireActor(maybeActor);
-
         const startDate = new Date(`${data.startDate}T00:00:00.000Z`);
         const endDate = new Date(`${data.endDate}T00:00:00.000Z`);
         if (endDate <= startDate) {
@@ -110,7 +123,22 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
         // A company id from the request means nothing on its own. Membership
         // is resolved from the SESSION actor, so a customer cannot book on
         // another company's account by editing a hidden field.
-        if (data.companyId && !canInCompany(actor, data.companyId, "booking:create")) {
+        //
+        // A GUEST has no session and therefore no memberships, so supplying
+        // either of these is refused outright rather than ignored. Ignoring a
+        // field an attacker set is how it ends up honoured by a later refactor.
+        if ((data.companyId || data.projectSiteId) && !maybeActor) {
+          return {
+            ok: false as const,
+            error: {
+              code: "forbidden",
+              message: "Sign in to book on a company account.",
+            },
+          };
+        }
+        const actor = maybeActor;
+
+        if (data.companyId && (!actor || !canInCompany(actor, data.companyId, "booking:create"))) {
           return {
             ok: false as const,
             error: {
@@ -131,6 +159,7 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
 
           const permitted =
             site &&
+            actor &&
             (site.ownerUserId === actor.userId ||
               (site.companyId !== null && canInCompany(actor, site.companyId, "site:read")));
 
@@ -194,6 +223,19 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
 
         const business = await getBusinessSettings();
 
+        // The customer record. A signed-in actor books as themselves; a guest
+        // is found or created by email, which is what keeps
+        // `booking.customer_user_id` NOT NULL and every scoped read unchanged.
+        const customer = actor
+          ? { userId: actor.userId, isGuest: false }
+          : await findOrCreateGuestCustomer({
+              email: data.customerEmail,
+              fullName: data.customerName,
+              phone: data.customerPhone,
+              locale: data.locale,
+            });
+        const customerUserId = customer.userId;
+
         // --- Commit --------------------------------------------------------
         // Try each candidate in turn: losing the exclusion-constraint race to
         // another customer is ordinary traffic under contention, not an error.
@@ -214,7 +256,7 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
               couponCode: data.couponCode,
 
               unitId: candidate.unitId,
-              customerUserId: actor.userId,
+              customerUserId,
               companyId: data.companyId ?? null,
               projectSiteId: data.projectSiteId ?? null,
               locale: data.locale,
@@ -248,6 +290,27 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
           throw lastError ?? new UnitNoLongerAvailableError();
         }
 
+        // --- Guest access ----------------------------------------------------
+        // A guest gets a session scoped to the booking they just made, so the
+        // payment return lands on their rental instead of a lookup form asking
+        // for a reference they were shown ten seconds ago.
+        //
+        // It grants nothing beyond this one booking (see `scopeFor`) and lasts
+        // hours, not weeks. Skipped for a signed-in actor, who already has a
+        // full session that this would replace with a narrower one.
+        // `customer.isGuest` and not merely `!actor`: the email typed at
+        // checkout may belong to an account that already exists, and a session
+        // carrying THAT person's user id must never be handed to whoever typed
+        // their address. Those bookings are reached by signing in.
+        if (customer.isGuest) {
+          const session = await createSession({
+            userId: customerUserId,
+            ipAddress: ip,
+            scopedBookingId: created.bookingId,
+          });
+          await setSessionCookie(session.token, session.expiresAt);
+        }
+
         // --- Payment -------------------------------------------------------
         // Started AFTER the booking transaction has committed. Holding a
         // database transaction open across a call to a payment provider is how
@@ -260,7 +323,12 @@ export async function createBookingAction(input: unknown): Promise<BookingAction
         try {
           const payment = await startPayment({
             bookingId: created.bookingId,
-            customer: { email: actor.email, name: actor.fullName },
+            // The details the PROVIDER gets are the ones given at checkout,
+            // which for a guest is the only identity there is.
+            customer: {
+              email: actor?.email ?? data.customerEmail,
+              name: actor?.fullName ?? data.customerName,
+            },
             returnUrl,
             locale: data.locale,
           });
@@ -325,6 +393,10 @@ export async function cancelBookingAction(input: unknown): Promise<CancelResult>
       {
         schema: cancelBookingSchema,
         requireAuth: true,
+        // A guest who looked up their booking may cancel it. The scoped read
+        // below still narrows to the one booking their session names, so this
+        // widens nothing beyond the rental they already proved they hold.
+        allowScopedSession: true,
         rateLimit: { name: "bookingCreate" },
         audit: { action: "booking.cancel", resourceType: "booking" },
       },
@@ -402,6 +474,93 @@ export async function cancelBookingAction(input: unknown): Promise<CancelResult>
           // Told, not hidden: the booking is cancelled either way, but the
           // customer must know whether the money has actually moved.
           refundPending: refund.status === "pending" || refund.status === "failed",
+        };
+      },
+    );
+  } catch (error) {
+    return { ok: false, error: toClientError(error) };
+  }
+}
+
+const lookupSchema = z
+  .object({
+    reference: z.string().min(4).max(40).trim(),
+    email: z.email().max(320),
+    locale: z.enum(["en", "ar"]).default("en"),
+  })
+  .strict();
+
+export type LookupResult =
+  | { ok: true; redirectTo: string }
+  | {
+      ok: false;
+      error: {
+        code: string;
+        message: string;
+        /** Per-field validation problems. Never says which half was wrong. */
+        issues?: { path: string; message: string }[];
+        retryAfterSeconds?: number;
+      };
+    };
+
+/**
+ * Find my booking — the guest replacement for signing in.
+ *
+ * Customers have no accounts, so this is how someone returns to their own
+ * rental to see the invoice, download the agreement, or cancel.
+ *
+ * Both the reference and the email are required. The reference alone is about
+ * a billion combinations, which is guessable given time, and a correct guess
+ * would expose a name, a phone number and a site address. Requiring the email
+ * makes a guessed reference worthless on its own.
+ *
+ * The failure message is IDENTICAL for "no such reference" and "wrong email".
+ * Distinguishing them would turn this form into an oracle for which references
+ * exist — the same disclosure the booking pages avoid by answering 404 rather
+ * than 403.
+ */
+export async function lookupBookingAction(input: unknown): Promise<LookupResult> {
+  try {
+    return await guard(
+      input,
+      {
+        schema: lookupSchema,
+        // Rate limited because this is a guessing surface by construction.
+        rateLimit: { name: "login" },
+        audit: { action: "booking.guest_lookup", resourceType: "booking" },
+      },
+      async ({ input: data, ip }) => {
+        const match = await resolveGuestBooking(data.reference, data.email);
+
+        if (!match) {
+          return {
+            ok: false as const,
+            error: {
+              code: "not_found",
+              // ONE message for every failure: no such reference, wrong email,
+              // and "that address has a real account, so this booking is
+              // reached by signing in" are indistinguishable here on purpose.
+              // The sign-in sentence is shown in all three cases, so it guides
+              // the account holder out of a dead end without telling anyone
+              // else which case they hit.
+              message:
+                "We could not find a booking with that reference and email address. " +
+                "Check the reference on your confirmation. If you have an account with us, sign in instead.",
+            },
+          };
+        }
+
+        // A session that can see this booking and nothing else, for four hours.
+        const session = await createSession({
+          userId: match.customerUserId,
+          ipAddress: ip,
+          scopedBookingId: match.bookingId,
+        });
+        await setSessionCookie(session.token, session.expiresAt);
+
+        return {
+          ok: true as const,
+          redirectTo: `/${data.locale}/booking/${data.reference.trim().toUpperCase()}`,
         };
       },
     );

@@ -29,10 +29,6 @@ export function otherLocale(locale: Locale): Locale {
   return locale === "en" ? "ar" : "en";
 }
 
-export function dirFor(locale: Locale): "ltr" | "rtl" {
-  return LOCALE_CONFIG[locale].dir;
-}
-
 /**
  * Dates are formatted in Asia/Riyadh regardless of where the server runs.
  * A rental starting "on the 14th" means the 14th in Riyadh, not in UTC.
@@ -45,10 +41,6 @@ export function formatDate(date: Date, locale: Locale, opts?: Intl.DateTimeForma
     day: "numeric",
     ...opts,
   }).format(date);
-}
-
-export function formatDateTime(date: Date, locale: Locale): string {
-  return formatDate(date, locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function formatNumber(value: number, locale: Locale, opts?: Intl.NumberFormatOptions): string {

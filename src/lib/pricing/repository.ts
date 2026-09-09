@@ -336,22 +336,6 @@ async function loadCoupon(code: string): Promise<CouponInput | null> {
   };
 }
 
-/** Cheapest daily rate for a class — the "from SAR X/day" on listing cards. */
-export async function cheapestDailyRate(classId: string): Promise<Halalas | null> {
-  const rows = await db.execute<{ rate_halalas: string }>(raw`
-    SELECT MIN(rt.rate_halalas) AS rate_halalas
-    FROM rate_tier rt
-    JOIN rate_card rc ON rc.id = rt.rate_card_id
-    WHERE rc.class_id = ${classId}
-      AND rc.is_active = TRUE
-      AND rt.tier = 'daily'
-      AND rc.valid_from <= now()
-      AND (rc.valid_to IS NULL OR rc.valid_to > now())
-  `);
-  const value = rows[0]?.rate_halalas;
-  return value ? BigInt(value) : null;
-}
-
 /** Serialise a pricing result for storage in booking.pricingSnapshot. */
 export function toPricingSnapshot(result: PricingResult) {
   return {

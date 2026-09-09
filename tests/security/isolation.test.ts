@@ -32,6 +32,7 @@ function actor(overrides: Partial<AuthenticatedActor> = {}): AuthenticatedActor 
     sessionId: "session-a",
     mfaSatisfied: false,
     mfaEnrolled: false,
+    scopedBookingId: null,
     memberships: [],
     ...overrides,
   };

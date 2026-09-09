@@ -90,10 +90,6 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
   }
 }
 
-export function invalidateSettingsCache(): void {
-  cache = null;
-}
-
 /**
  * Refund percentage for a cancellation, given notice.
  *

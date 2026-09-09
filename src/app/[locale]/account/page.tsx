@@ -38,6 +38,19 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
   const actor = await getActor();
   if (!actor) redirect(localePath(locale, `/login?next=${encodeURIComponent(`/${locale}/account`)}`));
 
+  // A guest who looked up a booking has no account and no rentals list — this
+  // page would show them a dashboard of exactly one row. Send them to the
+  // rental itself. `getActor` is used above rather than `getFullActor`
+  // precisely so this redirect can happen instead of a bare sign-in prompt.
+  if (actor.scopedBookingId) {
+    const [only] = await listBookingsForActor(actor, locale);
+    redirect(
+      only
+        ? localePath(locale, `/booking/${only.reference}`)
+        : localePath(locale, "/booking"),
+    );
+  }
+
   // Both reads are scoped to the actor inside the repository — there is no
   // unscoped variant to call by mistake.
   const [bookings, counts] = await Promise.all([
