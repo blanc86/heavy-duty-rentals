@@ -160,9 +160,25 @@ async function main() {
 
   await audit(await browser.newContext(), publicPages, "public");
 
-  const cookieFor = async (token) => [
-    { name: "hdr_session", value: token, domain: "localhost", path: "/" },
-  ];
+  /**
+   * The session cookie, matching whatever host is being audited.
+   *
+   * Both the name and the domain were pinned to local development, so pointing
+   * this at a deployment silently audited every "signed in" page as an
+   * anonymous visitor — passing, while checking a redirect instead of the page.
+   * The application uses the `__Host-` prefix over https, which additionally
+   * requires Secure and no Domain attribute, so the cookie is built with `url`
+   * rather than a domain there.
+   */
+  const cookieFor = async (token) => {
+    const url = new URL(BASE);
+    const secure = url.protocol === "https:";
+    return [
+      secure
+        ? { name: "__Host-hdr_session", value: token, url: url.origin, path: "/", secure: true }
+        : { name: "hdr_session", value: token, domain: url.hostname, path: "/" },
+    ];
+  };
 
   const ownerToken = booking ? await sessionTokenFor(booking.owner_email) : null;
   if (ownerToken) {
