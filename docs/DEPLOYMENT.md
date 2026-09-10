@@ -132,7 +132,7 @@ APP_URL="https://<host>" node scripts/verify-a11y.mjs     # WCAG 2.2 A/AA, both 
 
 The scripts that touch the database need `DATABASE_URL` pointed at the same one
 the deployment uses — and they need OWNER rights to build their fixtures, which
-is a different role from the one the app runs as (§9). Set `APP_DATABASE_ROLE`
+is a different role from the one the app runs as (§8). Set `APP_DATABASE_ROLE`
 so the pen test reports on the app's role rather than its own, and
 `SEED_ADMIN_EMAIL` so it can find the admin fixture:
 
@@ -152,7 +152,7 @@ localhost.
 
 ---
 
-## 9. Which database role the app connects as
+## 8. Which database role the app connects as
 
 Provisioning `hdr_app` is not the same as using it. Migrations run as the owner;
 the **application** should connect as `hdr_app`, which holds SELECT/INSERT on the
@@ -178,7 +178,7 @@ change to the integration.
 
 ---
 
-## 8. Known operational gaps
+## 9. Known operational gaps
 
 These are honest gaps, not oversights, and each is named in
 `docs/FINAL_REVIEW.md` with a next step:
