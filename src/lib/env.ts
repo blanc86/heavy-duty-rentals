@@ -28,6 +28,15 @@ const serverSchema = z.object({
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  /**
+   * True when DATABASE_URL points at a TRANSACTION-mode pooler (PgBouncer, and
+   * therefore Neon's and Supabase's pooled endpoints). Turns off prepared
+   * statements, which such a pooler cannot keep across transactions.
+   */
+  DATABASE_TRANSACTION_POOLER: z
+    .string()
+    .default("false")
+    .transform((v) => v === "true"),
 
   ENCRYPTION_KEY: base64Key.optional(),
   APP_SECRET: z.string().min(16).optional(),
@@ -54,7 +63,7 @@ const serverSchema = z.object({
   STORAGE_LOCAL_PATH: z.string().default("./storage"),
   SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(300),
 
-  RATE_LIMIT_BACKEND: z.enum(["memory", "redis"]).default("memory"),
+  RATE_LIMIT_BACKEND: z.enum(["memory", "postgres", "redis"]).default("memory"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 
   INSTANT_BOOK_MAX_CAPACITY_KG: z.coerce.number().int().positive().default(150_000),
@@ -113,6 +122,14 @@ export function assertProductionReady(): void {
   // whoever set the flag believed clearance was on. A silently ignored switch
   // on a legally required tax process is worse than one that either works or
   // fails, so it now refuses to start.
+  if (env.DEMO_MODE && env.PAYMENT_PROVIDER === "moyasar") {
+    // The reverse mistake: a real PSP behind a banner that tells customers
+    // their card will not be charged. Cards WOULD be charged.
+    failures.push(
+      "DEMO_MODE=true with PAYMENT_PROVIDER=moyasar. The demo banner tells every " +
+        "visitor no real payments are processed, which would be false. Turn one off.",
+    );
+  }
   if (env.TAX_INVOICE_PROVIDER === "zatca") {
     failures.push(
       "TAX_INVOICE_PROVIDER=zatca but ZATCA Phase 2 clearance is not implemented. " +
@@ -145,10 +162,33 @@ export function assertProductionReady(): void {
   }
 
   if (env.PAYMENT_PROVIDER === "mock") {
-    failures.push(
-      "PAYMENT_PROVIDER=mock moves no money and must never run in production. " +
-        "Configure a real SAMA-licensed PSP.",
-    );
+    // The one deliberate escape hatch, and it is narrow on purpose.
+    //
+    // A public demo is a legitimate thing to deploy: it lets a client walk the
+    // real booking flow before there is a merchant account. What is NOT
+    // legitimate is a deployment that takes bookings while quietly settling
+    // nothing, so the escape requires DEMO_MODE to be switched on explicitly —
+    // and DEMO_MODE also puts "no real payments are processed" on every page,
+    // in both languages, above the header. The label and the permission are
+    // the same switch, so it is not possible to have one without the other.
+    //
+    // It is announced at startup as well. An operator who inherits this
+    // deployment should learn from the logs that money is not moving, rather
+    // than from a customer asking where their machine is.
+    if (env.DEMO_MODE) {
+      console.warn(
+        "[startup] DEMO_MODE=true with PAYMENT_PROVIDER=mock. This deployment " +
+          "takes NO real payments and settles NO money. Every page carries a " +
+          "demo banner saying so. Set DEMO_MODE=false and configure a " +
+          "SAMA-licensed PSP before taking real business.",
+      );
+    } else {
+      failures.push(
+        "PAYMENT_PROVIDER=mock moves no money and must never run in production. " +
+          "Configure a real SAMA-licensed PSP, or set DEMO_MODE=true to deploy " +
+          "a clearly-labelled demo that takes no payments.",
+      );
+    }
   }
   if (env.RATE_LIMIT_BACKEND === "redis") {
     // Same shape as the ZATCA switch above: selected, unimplemented, and
@@ -156,7 +196,8 @@ export function assertProductionReady(): void {
     // so the operator lost the one signal that would have told them.
     failures.push(
       "RATE_LIMIT_BACKEND=redis but the Redis limiter is not implemented. " +
-        "Use `memory` and accept a per-instance limit, or implement it first.",
+        "Use `postgres` for a limit shared across instances, or `memory` and " +
+        "accept a per-instance limit.",
     );
   }
   if (env.RATE_LIMIT_BACKEND === "memory") {
@@ -165,8 +206,10 @@ export function assertProductionReady(): void {
     // count, which looks like a control while not being one.
     console.warn(
       "[startup] RATE_LIMIT_BACKEND=memory is per-process. With more than one " +
-        "instance the effective limits are multiplied by the instance count. " +
-        "See docs/SECURITY.md §2.",
+        "instance the effective limits are multiplied by the instance count, and " +
+        "on a serverless platform — where every cold start begins with an empty " +
+        "map — they effectively do not apply at all. Set RATE_LIMIT_BACKEND=postgres " +
+        "for a limit shared across instances. See docs/SECURITY.md §2.",
     );
   }
 

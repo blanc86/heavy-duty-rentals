@@ -183,7 +183,13 @@ export const settings = pgTable(
   },
 );
 
-/** Persisted rate-limit counters when RATE_LIMIT_BACKEND is not in-memory. */
+/**
+ * Persisted rate-limit counters, used when RATE_LIMIT_BACKEND=postgres.
+ *
+ * Written by `lib/server/rate-limit.ts` in a single upsert. This table existed
+ * from the first migration and nothing read it for a long time — the limiter
+ * was memory-only, which meant no limit at all on a serverless deployment.
+ */
 export const rateLimitBuckets = pgTable(
   "rate_limit_bucket",
   {

@@ -108,6 +108,22 @@ acts, and corrupting the audit trail.
 | Coupon validation | 10 / min per session |
 | Booking creation | 10 / hour per user |
 
+**Where the counters live matters as much as the numbers.** `RATE_LIMIT_BACKEND=memory`
+is per-process: across N instances the effective limit is N x the configured one,
+and on a serverless platform it is not a limit at all, because every cold start
+begins with an empty map and concurrent invocations each keep their own. Any
+deployment that is not a single long-lived process must set
+`RATE_LIMIT_BACKEND=postgres`, which shares one counter in `rate_limit_bucket`.
+
+That counter is incremented in a **single atomic upsert**. Read-then-write would
+let two concurrent callers both read `count = limit - 1` and both be allowed —
+and under an attack there is nothing but concurrent callers, so a limiter that
+only holds when requests are serialised is decorative. An integration test fires
+twenty simultaneous consumptions and asserts twenty distinct counts.
+
+The window is fixed rather than sliding, so a caller who keeps hammering cannot
+push their own reset further away.
+
 - Progressive account lockout with a time decay (`failedLoginCount` + `lockedUntil`).
 - **Uniform responses**: login and password reset return the same message and comparable timing regardless of whether the account exists. The booking lookup returns ONE message for a bad reference, a wrong email, and a booking owned by a real account — so it cannot be used as an oracle for which references exist.
 - Verification and reset tokens: 256-bit random, stored hashed, single-use, 1-hour TTL, invalidated on password change.

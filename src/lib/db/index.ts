@@ -18,6 +18,21 @@ function createClient() {
     // Fail fast rather than queueing requests behind an unreachable database.
     connect_timeout: 10,
     idle_timeout: 30,
+    /**
+     * Prepared statements, off behind a TRANSACTION-mode pooler.
+     *
+     * PgBouncer in transaction mode (which is what Neon's and Supabase's pooled
+     * endpoints are) hands a different backend connection to each transaction.
+     * A statement prepared on one is not there on the next, so postgres.js
+     * raises `prepared statement "..." does not exist` — intermittently, under
+     * concurrency, which is the worst way to find out.
+     *
+     * Off costs a little planning time per query. It is required for
+     * correctness on a pooled endpoint and harmless on a direct one, but it is
+     * still an explicit switch rather than a default: on a long-lived direct
+     * connection the prepared path is genuinely faster and worth keeping.
+     */
+    prepare: !env.DATABASE_TRANSACTION_POOLER,
     // Never log query parameters: they contain PII and, on the auth path,
     // token hashes. See docs/SECURITY.md §9.
     onnotice: () => {},
