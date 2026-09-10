@@ -26,6 +26,21 @@ try {
 }
 
 const BASE = process.env.APP_URL ?? "http://localhost:3000";
+
+/**
+ * The session cookie name, which DIFFERS between environments.
+ *
+ * The application uses the `__Host-` prefix in production: the browser then
+ * enforces that the cookie is Secure, path-scoped to /, and carries no Domain,
+ * so no subdomain can set or overwrite it. Dev runs over http, where such
+ * cookies are rejected outright, so it uses the bare name there.
+ *
+ * A script that hardcodes the dev name silently authenticates as NOBODY when
+ * pointed at a deployment — and then reports every ownership check as a breach,
+ * because an anonymous request is of course refused. Mirroring the application's
+ * own rule keeps these probes testing authorization rather than the harness.
+ */
+const SESSION_COOKIE = new URL(BASE).protocol === "https:" ? "__Host-hdr_session" : "hdr_session";
 const sql = postgres(process.env.DATABASE_URL, { max: 2, onnotice: () => {} });
 
 let pass = 0;
@@ -64,7 +79,7 @@ async function createSession(userId, { mfaSatisfied }) {
 async function get(pathname, token) {
   return fetch(new URL(pathname, BASE), {
     redirect: "manual",
-    headers: token ? { Cookie: `hdr_session=${token}` } : {},
+    headers: token ? { Cookie: `${SESSION_COOKIE}=${token}` } : {},
   });
 }
 

@@ -317,6 +317,27 @@ async function main() {
     `status ${adminAnon.status}`,
   );
 
+  // --- 7b. The payment hand-off actually exists ----------------------------
+  //
+  // Booking and paying are separate steps, and only the first was ever checked
+  // here. A deployed demo created bookings perfectly and then sent every
+  // customer to a 404, because the mock checkout refused to serve under
+  // NODE_ENV=production — so nothing could ever reach `confirmed` and the
+  // funnel looked fine right up to the moment someone tried to pay.
+  //
+  // An unknown intent answers "Unknown intent"; a DISABLED route answers
+  // "Not found". Both are 404s, so the body is what distinguishes a working
+  // hand-off from an absent one.
+  const mockCheckout = await fetch(
+    new URL("/api/payments/mock/checkout?intent=verify-flow-probe&return=/", BASE),
+  );
+  const mockBody = await mockCheckout.text();
+  check(
+    "the payment hand-off page is reachable (mock provider)",
+    !mockBody.includes("Not found"),
+    mockBody.slice(0, 40),
+  );
+
   // --- 8. SEO --------------------------------------------------------------
   const robots = await fetch(new URL("/robots.txt", BASE));
   check("robots.txt is served", robots.status === 200, `status ${robots.status}`);

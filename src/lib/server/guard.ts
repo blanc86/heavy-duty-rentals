@@ -174,13 +174,29 @@ export async function guard<TSchema extends z.ZodType, TResult>(
       throw new AuthorizationError("Two-factor authentication is required for this action.");
     }
 
-    // A booking-scoped session is refused unless this action opted in. Placed
-    // AFTER the other authorization checks so it can only ever subtract from
-    // what they allowed, never add to it.
+    // A booking-scoped session may not act AS the user it names. Placed AFTER
+    // the other authorization checks so it can only ever subtract from what
+    // they allowed, never add to it.
+    //
+    // What it must not do is refuse work that needs no identity at all. A guest
+    // who books a pump holds a scoped session for four hours; refusing every
+    // guarded endpoint left them unable to price a second machine, let alone
+    // book one — the checkout simply reported "please sign in" at someone who
+    // has no account to sign in to.
+    //
+    // So the rule splits by whether the action needs an actor. If it does, the
+    // scoped session is refused. If it does not, the caller is treated as
+    // ANONYMOUS: the session is dropped rather than honoured, so it can never
+    // leak an identity into an action that never asked for one, and a second
+    // booking correctly goes down the guest path and mints its own session.
     if (actor?.scopedBookingId && !options.allowScopedSession) {
-      throw new AuthorizationError(
-        "Please sign in to do that. Looking up a booking gives access to that booking only.",
-      );
+      if (needsActor) {
+        throw new AuthorizationError(
+          "Please sign in to do that. Looking up a booking gives access to that booking only.",
+        );
+      }
+      actor = null;
+      actorType = "anonymous";
     }
 
     // --- 5. Validate -------------------------------------------------------

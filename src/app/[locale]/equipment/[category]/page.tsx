@@ -47,11 +47,25 @@ export async function generateMetadata({
   };
 }
 
-export async function generateStaticParams() {
-  // Enumerated so the crawler finds every category from the sitemap and from
-  // internal links, not only by guessing slugs.
-  return [];
-}
+/**
+ * No `generateStaticParams` here, deliberately.
+ *
+ * There was one, returning an empty array, with a comment saying it helped
+ * crawlers find every category. It did not: discovery comes from the sitemap
+ * and from internal links, and this function has no bearing on either. What it
+ * did do was opt the route into static rendering — and since the root layout
+ * reads `cookies()` to resolve the header's signed-in state, every category
+ * page then threw DYNAMIC_SERVER_USAGE on a cold request in production. The
+ * rejection was unhandled, so the Node process exited 128 and took any other
+ * in-flight request on that instance with it.
+ *
+ * It survived local development because `next dev` renders everything
+ * dynamically, so the fault only ever appeared on a real deployment. All
+ * fourteen category pages were down.
+ *
+ * This route is inherently dynamic: it depends on the request's session. Say
+ * nothing and let Next treat it that way.
+ */
 
 export default async function CategoryPage({
   params,

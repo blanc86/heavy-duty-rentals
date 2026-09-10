@@ -30,8 +30,22 @@ try {
   /* environment may be injected by the platform */
 }
 
-if (process.env.NODE_ENV === "production") {
-  console.error("Refusing to seed demo data into a production environment.");
+if (process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "true") {
+  console.error(
+    "Refusing to seed demo data into a production environment.\n" +
+      "If this IS a demo deployment, set DEMO_MODE=true — the same switch that " +
+      "permits the mock payment provider and puts the demo banner on every page.",
+  );
+  process.exit(1);
+}
+
+// A demo deployment is public, so the development bootstrap password would be
+// an open door to the admin console for anyone who has read the repository.
+if (process.env.NODE_ENV === "production" && !process.env.SEED_ADMIN_PASSWORD) {
+  console.error(
+    "Refusing to seed a production demo without SEED_ADMIN_PASSWORD.\n" +
+      "The default is a published development password and this deployment is public.",
+  );
   process.exit(1);
 }
 
@@ -1302,7 +1316,14 @@ async function main() {
   console.log("\nDemo sign-in:");
   console.log(`  admin:    ${process.env.SEED_ADMIN_EMAIL || "admin@example.com"}`);
   console.log(`  customer: customer@example.com`);
-  console.log(`  password: ${process.env.SEED_ADMIN_PASSWORD || "ChangeMe_Dev_Only_123"}`);
+  // Printed only when it is the published development default, which is not a
+  // secret. A real one supplied by the operator is theirs to know already, and
+  // echoing it puts a live credential into terminal scrollback and CI logs.
+  console.log(
+    process.env.SEED_ADMIN_PASSWORD
+      ? "  password: (as supplied in SEED_ADMIN_PASSWORD)"
+      : "  password: ChangeMe_Dev_Only_123",
+  );
   console.log("\nAll equipment is FICTIONAL demo data and is flagged as such in the UI.");
 
   // The demo photographs live in class_image and are fetched separately, so a

@@ -17,8 +17,28 @@ import { eq } from "drizzle-orm";
  * signature verification and replay defence. A mock that shortcut straight to
  * "confirmed" would be testing nothing.
  */
+/**
+ * Who may reach this endpoint.
+ *
+ * "Paying" here emits a signed webhook that confirms a booking without money
+ * moving, so on a real production deployment this route is a free-booking
+ * exploit and must not exist. That is why NODE_ENV=production blocks it.
+ *
+ * A DEMO deployment is the one case where it is the intended behaviour: the
+ * whole point is to walk book -> pay -> webhook -> confirmed without a merchant
+ * account, and every page already says no real payments are processed. Blocking
+ * it there does not make anything safer — it just creates bookings that can
+ * never be paid, which is how this was found.
+ *
+ * DEMO_MODE is safe to gate on because `assertProductionReady` refuses to boot
+ * with DEMO_MODE alongside a REAL provider, so this can never be reachable on a
+ * deployment that takes actual card payments.
+ */
 function assertMockProvider(): void {
-  if (env.PAYMENT_PROVIDER !== "mock" || env.NODE_ENV === "production") {
+  if (env.PAYMENT_PROVIDER !== "mock") {
+    throw new Error("The mock checkout is not available.");
+  }
+  if (env.NODE_ENV === "production" && !env.DEMO_MODE) {
     throw new Error("The mock checkout is not available.");
   }
 }

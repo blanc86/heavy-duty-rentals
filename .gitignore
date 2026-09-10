@@ -18,3 +18,8 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Pulled Vercel environments and local credential dumps. These contain live
+# secrets (database URLs, keys) and must never be committed.
+.vercel.env.*
+*.local
