@@ -173,9 +173,13 @@ async function main() {
   const cookieFor = async (token) => {
     const url = new URL(BASE);
     const secure = url.protocol === "https:";
+    // Playwright takes EITHER `url` (from which it derives domain and path) or
+    // an explicit `domain` + `path` — never both. The `url` form is the right
+    // one for a `__Host-` cookie anyway, since that prefix forbids a Domain
+    // attribute and requires path=/, which `url.origin` gives exactly.
     return [
       secure
-        ? { name: "__Host-hdr_session", value: token, url: url.origin, path: "/", secure: true }
+        ? { name: "__Host-hdr_session", value: token, url: url.origin }
         : { name: "hdr_session", value: token, domain: url.hostname, path: "/" },
     ];
   };

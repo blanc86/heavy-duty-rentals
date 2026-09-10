@@ -131,7 +131,50 @@ APP_URL="https://<host>" node scripts/verify-a11y.mjs     # WCAG 2.2 A/AA, both 
 ```
 
 The scripts that touch the database need `DATABASE_URL` pointed at the same one
-the deployment uses.
+the deployment uses — and they need OWNER rights to build their fixtures, which
+is a different role from the one the app runs as (§9). Set `APP_DATABASE_ROLE`
+so the pen test reports on the app's role rather than its own, and
+`SEED_ADMIN_EMAIL` so it can find the admin fixture:
+
+```bash
+APP_URL="https://<host>" DATABASE_URL="<owner url>" APP_DATABASE_ROLE=hdr_app SEED_ADMIN_EMAIL="<your admin>" node scripts/pentest.mjs
+```
+
+**Things that only break on a real deployment.** `next dev` renders everything
+dynamically and the scripts default to local conventions, so these three passed
+every local check and still failed in production: a route declaring
+`generateStaticParams` while the layout reads `cookies()` (500s on cold
+requests, and the unhandled rejection exits the process); the mock checkout
+refusing to serve under `NODE_ENV=production`; and the scripts using the
+development session cookie name, which makes them authenticate as nobody and
+report false breaches. Point the scripts at the deployment, not just at
+localhost.
+
+---
+
+## 9. Which database role the app connects as
+
+Provisioning `hdr_app` is not the same as using it. Migrations run as the owner;
+the **application** should connect as `hdr_app`, which holds SELECT/INSERT on the
+append-only tables and no UPDATE or DELETE. That is what makes "the audit log
+cannot be rewritten" a control rather than a note — an UPDATE is refused with
+`permission denied for table audit_log`.
+
+`db:grant` creates the role NOLOGIN. To use it:
+
+```sql
+ALTER ROLE hdr_app WITH LOGIN PASSWORD '<generated>';
+```
+
+Then point `DATABASE_URL` at that role and keep the owner's URL for migrations.
+Exercise it before switching — read the catalogue, write a booking, append an
+audit row — because a role that cannot write audit entries fails every guarded
+request.
+
+On Vercel + Neon, note that the Neon integration owns `DATABASE_URL`. If it
+re-syncs, it overwrites this with the owner's connection string and the app
+silently returns to running as owner. Re-check §11 of the pen test after any
+change to the integration.
 
 ---
 
