@@ -178,7 +178,39 @@ change to the integration.
 
 ---
 
-## 9. Known operational gaps
+## 9. Email
+
+Booking confirmations are sent from the **verified webhook path**, the moment a
+payment is captured and the booking actually moves to `confirmed`. Gating on the
+transition rather than on the webhook matters: providers retry, and `moved` is
+false on a replay, so a customer gets exactly one confirmation however many
+times the event arrives.
+
+Two rules the code holds to:
+
+- **A send never fails the thing it reports on.** The card is already charged
+  and the machine reserved by then. An unreachable mail API must not turn that
+  into a 500 that makes the provider retry a webhook it already delivered.
+- **Every attempt leaves a row** in `notification`, `queued` -> `sent` /
+  `failed` / `suppressed`. `suppressed` means no transport is configured, which
+  is not the same as a delivery failure — distinguishing them is what stops "no
+  email configured" being investigated as a bug for a week. The row stores
+  template variables, never the rendered body, which is full of PII.
+
+To actually send, set `EMAIL_PROVIDER=resend` and `RESEND_API_KEY`. **A verified
+sending domain is required** to reach anyone other than the account holder —
+without it Resend accepts mail to your own address and rejects every customer,
+so it works in testing and fails in production. `EMAIL_FROM` must be on that
+domain. A `.vercel.app` host cannot be verified; this needs a real domain with
+DNS access.
+
+Until then `EMAIL_PROVIDER=console` logs the message, records the row as
+`suppressed`, and the confirmation page does **not** claim an email was sent —
+that line is gated on the provider genuinely delivering.
+
+---
+
+## 10. Known operational gaps
 
 These are honest gaps, not oversights, and each is named in
 `docs/FINAL_REVIEW.md` with a next step:

@@ -270,6 +270,7 @@ export const ar: Dictionary = {
     confirmTitle: "تم تأكيد الحجز",
     confirmSubtitle:
       "تم تأكيد إيجارك. احفظ المرجع أدناه — فهو وسيلتك لفتح هذا الحجز مجددًا.",
+    confirmEmailed: "أرسلنا تأكيد الحجز والمرجع إلى البريد الإلكتروني الذي حجزت به.",
     bookingReference: "رقم الحجز",
     viewBooking: "عرض الحجز",
     downloadAgreement: "تحميل عقد التأجير",

@@ -5,6 +5,7 @@ import { payments, paymentWebhookEvents, refunds } from "@/lib/db/schema/finance
 import { uuidv7 } from "@/lib/ids";
 import type { Halalas } from "@/lib/money";
 import { transitionBooking } from "@/lib/booking/service";
+import { sendBookingConfirmation } from "@/lib/notifications/service";
 import { writeAudit } from "@/lib/server/audit";
 import { getPaymentProvider } from "./index";
 import type { PaymentIntent, VerifiedWebhookEvent } from "./types";
@@ -220,7 +221,7 @@ export async function processWebhookEvent(
       if (payment.kind === "rental_charge") {
         // Compare-and-set: an out-of-order or replayed event cannot resurrect
         // a cancelled booking.
-        await transitionBooking({
+        const moved = await transitionBooking({
           bookingId: payment.bookingId,
           toStatus: "confirmed",
           expectedFrom: ["pending_payment"],
@@ -228,6 +229,14 @@ export async function processWebhookEvent(
           type: "payment.captured",
           metadata: { paymentId: payment.id, providerEventId: event.providerEventId },
         });
+
+        // Confirmation email, gated on the transition ACTUALLY happening.
+        // Payment providers retry webhooks, and `moved` is false on a replay,
+        // so a customer receives exactly one confirmation however many times
+        // the event is delivered. It cannot throw — see notifications/service.
+        if (moved) {
+          await sendBookingConfirmation(payment.bookingId);
+        }
       }
 
       await writeAudit({

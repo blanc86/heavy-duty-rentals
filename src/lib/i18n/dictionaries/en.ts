@@ -264,6 +264,7 @@ export const en = {
     confirmTitle: "Booking confirmed",
     confirmSubtitle:
       "Your rental is confirmed. Save the reference below — it is how you reopen this booking.",
+    confirmEmailed: "We have emailed your confirmation and reference to the address you booked with.",
     bookingReference: "Booking reference",
     viewBooking: "View booking",
     downloadAgreement: "Download rental agreement",

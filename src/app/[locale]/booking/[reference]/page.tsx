@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { Alert, Badge, Card, CardBody, Container, ScrollX } from "@/components/ui";
 import { CancelBooking } from "@/components/booking/cancel-booking";
 import { getActor } from "@/lib/auth/session";
+import { getEmailProvider } from "@/lib/notifications";
 import { getBookingForActor } from "@/lib/booking/repository";
 import { getDictionary } from "@/lib/i18n";
 import { formatDate, formatNumber, isLocale, localePath, type Locale } from "@/lib/i18n/config";
@@ -51,6 +52,8 @@ export default async function BookingDetailPage({
   const locale: Locale = rawLocale;
   const dict = getDictionary(locale);
 
+  const emailDelivers = getEmailProvider().delivers;
+
   const actor = await getActor();
   if (!actor) {
   // No customer accounts: an unidentified visitor proves ownership with the
@@ -92,6 +95,13 @@ export default async function BookingDetailPage({
             </div>
             <h1 className="text-xl font-bold text-steel-950">{dict.booking.confirmTitle}</h1>
             <p className="mt-1 text-sm text-steel-700">{dict.booking.confirmSubtitle}</p>
+            {/* Only claimed when the configured provider actually delivers.
+                Telling a customer their confirmation has been emailed when it
+                went to a server log is how someone waits for a message that is
+                never coming, and stops watching for the reference on screen. */}
+            {emailDelivers && (
+              <p className="mt-1 text-sm text-steel-600">{dict.booking.confirmEmailed}</p>
+            )}
           </div>
         )}
 

@@ -54,7 +54,8 @@ const serverSchema = z.object({
 
   TAX_INVOICE_PROVIDER: z.enum(["local", "zatca"]).default("local"),
 
-  EMAIL_PROVIDER: z.enum(["console", "smtp"]).default("console"),
+  EMAIL_PROVIDER: z.enum(["console", "resend", "smtp"]).default("console"),
+  RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Heavy Duty Rentals <no-reply@example.com>"),
 
   SMS_PROVIDER: z.enum(["console", "http"]).default("console"),
@@ -151,7 +152,7 @@ export function assertProductionReady(): void {
   // (docs/FINAL_REVIEW.md §3). A gap is fine. A gap wearing a working switch is
   // not, because it is discovered by a customer not receiving something.
   const unimplemented: [string, boolean, string][] = [
-    ["EMAIL_PROVIDER=smtp", env.EMAIL_PROVIDER === "smtp", "no mail transport is implemented"],
+    ["EMAIL_PROVIDER=smtp", env.EMAIL_PROVIDER === "smtp", "no SMTP transport is implemented (use `resend`)"],
     ["SMS_PROVIDER=http", env.SMS_PROVIDER === "http", "no SMS transport is implemented"],
     ["STORAGE_PROVIDER=s3", env.STORAGE_PROVIDER === "s3", "no S3 driver is implemented"],
   ];
@@ -190,6 +191,22 @@ export function assertProductionReady(): void {
       );
     }
   }
+  if (env.EMAIL_PROVIDER === "resend" && !env.RESEND_API_KEY) {
+    failures.push(
+      "EMAIL_PROVIDER=resend but RESEND_API_KEY is not set. Every confirmation " +
+        "would be recorded as failed and no customer would hear from us.",
+    );
+  }
+  if (env.EMAIL_PROVIDER === "console") {
+    // Not fatal — a demo may legitimately send nothing — but silence here means
+    // customers who paid never hear anything and nobody notices for weeks.
+    console.warn(
+      "[startup] EMAIL_PROVIDER=console: booking confirmations are written to " +
+        "the log, NOT delivered. Customer names, sites and phone numbers will " +
+        "appear in the log store. Configure `resend` before taking real business.",
+    );
+  }
+
   if (env.RATE_LIMIT_BACKEND === "redis") {
     // Same shape as the ZATCA switch above: selected, unimplemented, and
     // silently ignored — while also suppressing the `memory` warning below,
