@@ -68,6 +68,36 @@ async function markSuppressed(id: string, reason: string): Promise<void> {
 }
 
 /**
+ * Did THIS booking's confirmation actually reach the customer?
+ *
+ * Asked by the booking page, which must not claim an email was sent unless one
+ * was. Reading the provider's capability instead is not good enough: a provider
+ * can be capable in general and still reject a particular address — Resend
+ * without a verified domain accepts mail to the account holder and refuses
+ * every customer, so "the provider delivers" would be true while this
+ * customer's message bounced.
+ *
+ * Only `sent` counts. `queued`, `failed` and `suppressed` all mean the customer
+ * has nothing in their inbox, and the page should stay quiet and leave the
+ * reference on screen doing its job.
+ */
+export async function bookingConfirmationWasDelivered(bookingId: string): Promise<boolean> {
+  try {
+    const rows = await db.execute<{ ok: boolean }>(raw`
+      SELECT TRUE AS ok FROM notification
+      WHERE template_key = 'booking.confirmed'
+        AND status = 'sent'
+        AND payload ->> 'bookingId' = ${bookingId}
+      LIMIT 1
+    `);
+    return rows.length > 0;
+  } catch {
+    // A page must not fail because a reassurance line could not be resolved.
+    return false;
+  }
+}
+
+/**
  * Confirm a booking by email.
  *
  * Called once, from the verified-webhook path, and only when the booking
