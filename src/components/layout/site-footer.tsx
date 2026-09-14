@@ -1,140 +1,143 @@
 import Link from "next/link";
+import { BUSINESS, SERVICE_AREAS } from "@/content/business";
+import { Container, MailIcon, PhoneIcon, WhatsAppIcon } from "@/components/ui";
+import { activeCategories, categoryPath } from "@/lib/catalog";
+import { mailtoHref, telHref, whatsappHref } from "@/lib/contact";
 import type { Dictionary } from "@/lib/i18n";
-import { localePath, type Locale } from "@/lib/i18n/config";
-import type { BusinessSettings } from "@/lib/settings";
+import type { Locale } from "@/lib/i18n/config";
+import { href } from "@/lib/site";
+import { Logo } from "./logo";
 
 /**
- * Site footer.
+ * Footer.
  *
- * Carries the identity disclosures the Saudi e-commerce framework expects to
- * be visible — trade name, working contact, CR and VAT numbers — plus the
- * policy links that must be published and reachable before an order completes
- * (docs/research.md §7).
- *
- * The values come from settings and are DEMO PLACEHOLDERS until the business
- * replaces them; nothing here asserts a real registration.
+ * Doubles as the site's internal-link map: every equipment category and every
+ * service area is one click from any page, which is how search engines find
+ * and weigh those pages, and how a visitor who scrolled past everything still
+ * finds the one they came for.
  */
-export function SiteFooter({
-  locale,
-  dict,
-  business,
-}: {
-  locale: Locale;
-  dict: Dictionary;
-  business: BusinessSettings;
-}) {
-  const name = locale === "ar" ? business.companyNameAr : business.companyNameEn;
-  const address = locale === "ar" ? business.addressAr : business.addressEn;
-
-  const columns = [
-    {
-      title: dict.footer.equipment,
-      links: [
-        { href: "/equipment", label: dict.equipment.allEquipment },
-        { href: "/equipment/mobile-cranes", label: locale === "ar" ? "رافعات متحركة" : "Mobile cranes" },
-        { href: "/equipment/forklifts", label: locale === "ar" ? "رافعات شوكية" : "Forklifts" },
-        { href: "/equipment/excavators", label: locale === "ar" ? "حفارات" : "Excavators" },
-        { href: "/compare", label: dict.nav.compare },
-      ],
-    },
-    {
-      title: dict.footer.company,
-      links: [
-        {
-          href: "/for-contractors",
-          label: locale === "ar" ? "للمقاولين" : "For contractors",
-        },
-        { href: "/about", label: dict.nav.about },
-        { href: "/locations", label: dict.nav.locations },
-        { href: "/safety", label: dict.nav.safety },
-        { href: "/guides", label: dict.nav.guides },
-      ],
-    },
-    {
-      title: dict.footer.support,
-      links: [
-        { href: "/how-it-works", label: dict.nav.howItWorks },
-        { href: "/faq", label: dict.nav.faq },
-        // "Support" used to sit here pointing at /account/support, a console
-        // that does not exist — a 404 in the footer of every page. Contact IS
-        // the support surface, and it is already listed directly above, so the
-        // duplicate entry is gone rather than repointed at the same URL.
-        { href: "/contact", label: dict.nav.contact },
-        { href: "/booking", label: dict.booking.lookupTitle },
-        // Staff sign-in lives here and only here. It is not a customer
-        // destination, and putting it in the header invited people without
-        // accounts to hunt for a password they were never issued.
-        { href: "/login", label: dict.auth.staffSignIn },
-      ],
-    },
-    {
-      title: dict.footer.legal,
-      links: [
-        { href: "/legal/terms", label: dict.footer.terms },
-        { href: "/legal/rental-terms", label: dict.footer.rentalTerms },
-        { href: "/legal/privacy", label: dict.footer.privacy },
-        { href: "/legal/cancellation", label: dict.footer.cancellation },
-      ],
-    },
-  ];
+export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dictionary }) {
+  const year = new Date().getFullYear();
+  const linkClass = "text-steel-300 hover:text-white hover:underline underline-offset-4";
 
   return (
-    <footer className="mt-16 border-t border-steel-200 bg-white">
-      <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="lg:col-span-1">
-            <p className="text-sm font-bold text-steel-950">{name}</p>
-            <address className="mt-2 space-y-1 text-sm not-italic text-steel-600">
-              <p>{address}</p>
-              <p>
-                <a href={`tel:${business.phone.replace(/\s/g, "")}`} className="hover:underline">
-                  <span className="numeric-latin">{business.phone}</span>
+    <footer className="border-t-4 border-machine-500 bg-steel-950 text-steel-300">
+      <Container className="py-14">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div>
+            <Logo locale={locale} onDark />
+            <p className="mt-4 max-w-xs">{dict.footer.about}</p>
+            <ul className="mt-6 space-y-3">
+              <li>
+                <a href={telHref()} className="inline-flex items-center gap-2.5 text-white hover:underline underline-offset-4">
+                  <PhoneIcon className="h-4 w-4 text-machine-500" />
+                  <span className="ltr-nums">{BUSINESS.phone.display}</span>
                 </a>
-              </p>
-              <p>
-                <a href={`mailto:${business.email}`} className="hover:underline">
-                  {business.email}
+              </li>
+              <li>
+                <a
+                  href={whatsappHref(dict.messages.general)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2.5 text-white hover:underline underline-offset-4"
+                >
+                  <WhatsAppIcon className="h-4 w-4 text-machine-500" />
+                  {dict.cta.chatOnWhatsapp}
                 </a>
-              </p>
-            </address>
+              </li>
+              <li>
+                <a
+                  href={mailtoHref({ subject: dict.messages.emailSubject })}
+                  className="inline-flex items-center gap-2.5 text-white hover:underline underline-offset-4"
+                >
+                  <MailIcon className="h-4 w-4 text-machine-500" />
+                  <span className="ltr-nums">{BUSINESS.email}</span>
+                </a>
+              </li>
+            </ul>
           </div>
 
-          {columns.map((column) => (
-            <nav key={column.title} aria-label={column.title}>
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-steel-500">
-                {column.title}
-              </h2>
-              <ul className="mt-3 space-y-2">
-                {column.links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={localePath(locale, link.href)}
-                      className="text-sm text-steel-700 hover:text-steel-950 hover:underline"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
+          <nav aria-label={dict.footer.equipment}>
+            <h2 className="font-display text-lg font-bold text-white">{dict.footer.equipment}</h2>
+            <ul className="mt-4 space-y-2.5">
+              {activeCategories().map((category) => (
+                <li key={category.slug}>
+                  <Link href={href(locale, categoryPath(category))} className={linkClass}>
+                    {category.name[locale]}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <nav aria-label={dict.nav.serviceAreas}>
+            <h2 className="font-display text-lg font-bold text-white">{dict.nav.serviceAreas}</h2>
+            <ul className="mt-4 space-y-2.5">
+              {SERVICE_AREAS.map((area) => (
+                <li key={area.slug}>
+                  <Link href={href(locale, `/service-areas/${area.slug}`)} className={linkClass}>
+                    {area.city[locale]}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <nav aria-label={dict.footer.company}>
+            <h2 className="font-display text-lg font-bold text-white">{dict.footer.company}</h2>
+            <ul className="mt-4 space-y-2.5">
+              {[
+                { path: "/about", label: dict.nav.about },
+                { path: "/contact", label: dict.nav.contact },
+                { path: "/guides", label: dict.nav.guides },
+                { path: "/faq", label: dict.nav.faq },
+                { path: "/service-areas", label: dict.nav.serviceAreas },
+              ].map((link) => (
+                <li key={link.path}>
+                  <Link href={href(locale, link.path)} className={linkClass}>
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
 
-        <div className="mt-10 flex flex-col gap-3 border-t border-steel-200 pt-6 text-xs text-steel-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-steel-400 md:flex-row md:items-center md:justify-between">
           <p>
-            © <span className="numeric-latin">{new Date().getFullYear()}</span> {name}.{" "}
-            {dict.footer.rights}
+            © <span className="ltr-nums">{year}</span> {BUSINESS.legalName ?? BUSINESS.name[locale]}. {dict.footer.rights}
+            {BUSINESS.crNumber && (
+              <>
+                {" "}
+                {dict.footer.crNumber} <span className="ltr-nums">{BUSINESS.crNumber}</span>
+              </>
+            )}
+            {BUSINESS.vatNumber && (
+              <>
+                {" "}
+                {dict.footer.vatNumber} <span className="ltr-nums">{BUSINESS.vatNumber}</span>
+              </>
+            )}
           </p>
-          <p className="flex flex-wrap gap-x-4 gap-y-1">
-            <span>
-              {dict.footer.crNumber}: <span className="numeric-latin">{business.crNumber}</span>
-            </span>
-            <span>
-              {dict.footer.vatNumber}: <span className="numeric-latin">{business.vatNumber}</span>
-            </span>
-          </p>
+          <ul className="flex flex-wrap gap-x-5 gap-y-2">
+            <li>
+              <Link href={href(locale, "/privacy")} className="hover:text-white hover:underline underline-offset-4">
+                {dict.footer.privacy}
+              </Link>
+            </li>
+            <li>
+              <Link href={href(locale, "/terms")} className="hover:text-white hover:underline underline-offset-4">
+                {dict.footer.terms}
+              </Link>
+            </li>
+            <li>
+              <Link href={href(locale, "/image-credits")} className="hover:text-white hover:underline underline-offset-4">
+                {dict.footer.credits}
+              </Link>
+            </li>
+          </ul>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }

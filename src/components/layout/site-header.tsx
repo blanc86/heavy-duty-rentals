@@ -1,148 +1,99 @@
-import Link from "next/link";
-import type { AuthenticatedActor } from "@/lib/auth/session";
+import { BUSINESS } from "@/content/business";
+import { GUIDES } from "@/content/guides";
+import { ActionLink, ButtonLink, PhoneIcon, WhatsAppIcon } from "@/components/ui";
+import { telHref, whatsappHref } from "@/lib/contact";
 import type { Dictionary } from "@/lib/i18n";
-import { localePath, otherLocale, type Locale } from "@/lib/i18n/config";
+import type { Locale } from "@/lib/i18n/config";
+import { href } from "@/lib/site";
 import { LocaleSwitch } from "./locale-switch";
-import { SignOutButton } from "./sign-out-button";
-import { MobileNav } from "./mobile-nav";
+import { Logo } from "./logo";
+import { MobileMenu } from "./mobile-menu";
+import { NavLinks } from "./nav-links";
 
 /**
  * Site header.
  *
- * A Server Component: the navigation, the sign-in state and the language
- * switch are all rendered on the server, so the header costs no JavaScript.
- * Only the mobile drawer is a client island.
+ * Four links and a quote button — research across rental sites found the ones
+ * that convert keep navigation short and put the phone number where a site
+ * manager's eye goes first. The phone number is a real tap target on desktop
+ * too: plenty of procurement staff call from a desk with a softphone.
  */
-export function SiteHeader({
-  locale,
-  dict,
-  actor,
-  pathname,
-  search = "",
-}: {
-  locale: Locale;
-  dict: Dictionary;
-  actor: AuthenticatedActor | null;
-  pathname: string;
-  /** Current query string, including the leading "?". Preserved across the
-      language switch so a configured booking survives the change. */
-  search?: string;
-}) {
-  const nav = [
-    { href: localePath(locale, "/equipment"), label: dict.nav.equipment },
-    { href: localePath(locale, "/locations"), label: dict.nav.locations },
-    { href: localePath(locale, "/how-it-works"), label: dict.nav.howItWorks },
-    { href: localePath(locale, "/safety"), label: dict.nav.safety },
-    { href: localePath(locale, "/guides"), label: dict.nav.guides },
+export function SiteHeader({ locale, dict }: { locale: Locale; dict: Dictionary }) {
+  const items = [
+    { href: href(locale), label: dict.nav.home },
+    { href: href(locale, "/equipment"), label: dict.nav.equipment },
+    { href: href(locale, "/about"), label: dict.nav.about },
+    { href: href(locale, "/contact"), label: dict.nav.contact },
   ];
-
-  // The language switch must land on the SAME page in the other locale, not
-  // dump the user on the homepage — the single most common i18n failure.
-  const target = otherLocale(locale);
-  // The query string rides along: /en/book/x?start=...&branch=... must not
-  // become /ar/book/x, which would throw away the customer's configuration.
-  const switchPath = pathname.startsWith(`/${locale}`)
-    ? `/${target}${pathname.slice(locale.length + 1)}`
-    : `/${target}`;
-  const switchHref = `${switchPath}${search}`;
+  const guideSlugs = GUIDES.map((guide) => guide.slug);
 
   return (
     <header className="sticky top-0 z-40 border-b border-steel-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6 lg:px-8">
-        <Link
-          href={localePath(locale, "/")}
-          className="flex shrink-0 items-center gap-2"
-          aria-label={dict.meta.siteName}
-        >
-          <span aria-hidden="true" className="grid h-9 w-9 place-items-center rounded bg-amber-500">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M3 20h18M6 20V9l6-5v16M12 9h7v11" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span className="hidden text-sm font-bold leading-tight text-steel-950 sm:block">
-            {dict.meta.siteName}
-          </span>
-        </Link>
+      <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-4 px-5 sm:px-8 lg:h-[4.5rem]">
+        <Logo locale={locale} />
 
-        <nav aria-label={dict.a11y.mainNavigation} className="hidden lg:block">
-          <ul className="flex items-center gap-1">
-            {nav.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="rounded-[--radius-control] px-3 py-2 text-sm font-medium text-steel-700 transition-colors hover:bg-steel-100 hover:text-steel-950"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
+        <nav aria-label={dict.nav.primary} className="ms-6 hidden lg:block">
+          <NavLinks
+            items={items}
+            className="flex items-center gap-1"
+            linkClassName="relative inline-flex h-[4.5rem] items-center px-3 text-[1rem] font-semibold text-steel-600 hover:text-steel-950"
+          />
         </nav>
 
-        <div className="ms-auto flex items-center gap-2">
-          <LocaleSwitch href={switchHref} label={dict.nav.switchLanguage} targetLocale={target} />
-
-          {actor ? (
-            <>
-              {actor.isPlatformAdmin && (
-                <Link
-                  href={localePath(locale, "/admin")}
-                  className="hidden rounded-[--radius-control] px-3 py-2 text-sm font-medium text-steel-700 hover:bg-steel-100 sm:block"
-                >
-                  {dict.nav.admin}
-                </Link>
-              )}
-              <Link
-                href={localePath(locale, "/account")}
-                className="hidden rounded-[--radius-control] border border-steel-300 px-3 py-2 text-sm font-medium text-steel-800 hover:bg-steel-100 sm:block"
-              >
-                {dict.nav.dashboard}
-              </Link>
-              <div className="hidden sm:block">
-                <SignOutButton locale={locale} label={dict.nav.logout} />
-              </div>
-            </>
-          ) : (
-            /* Not "Sign in": customers have no accounts. The only thing an
-               anonymous visitor could want here is the rental they already
-               booked, so that is what the link says and does. Staff reach
-               /login from the footer, which is where they will look. */
-            <Link
-              href={localePath(locale, "/booking")}
-              className="hidden rounded-[--radius-control] px-3 py-2 text-sm font-medium text-steel-700 hover:bg-steel-100 sm:block"
-            >
-              {dict.nav.myBooking}
-            </Link>
-          )}
-
-          {/* The primary CTA is present in the header on every page: the most
-              common entry point is a Google landing on a deep equipment page,
-              and the next action must never be more than one tap away. */}
-          <Link
-            href={localePath(locale, "/equipment")}
-            className="inline-flex min-h-[2.5rem] items-center rounded-[--radius-control] bg-amber-500 px-3 text-sm font-semibold text-steel-950 transition-colors hover:bg-amber-400 sm:px-4"
+        <div className="ms-auto flex items-center gap-1 sm:gap-2">
+          <a
+            href={telHref()}
+            className="hidden items-center gap-2 rounded-control px-3 py-2 font-semibold text-steel-900 hover:bg-steel-100 xl:inline-flex"
           >
-            {dict.equipment.checkAvailability}
-          </Link>
+            <PhoneIcon className="h-[1.1rem] w-[1.1rem]" />
+            <span className="ltr-nums">{BUSINESS.phone.display}</span>
+          </a>
 
-          <MobileNav
+          <LocaleSwitch
             locale={locale}
-            items={nav}
-            accountLabel={actor ? dict.nav.dashboard : dict.nav.myBooking}
-            accountHref={localePath(locale, actor ? "/account" : "/booking")}
-            openLabel={dict.a11y.openMenu}
-            closeLabel={dict.common.close}
-            menuLabel={dict.nav.menu}
-            signOut={
-              actor ? (
-                <SignOutButton
-                  locale={locale}
-                  label={dict.nav.logout}
-                  className="w-full rounded-[--radius-control] px-3 py-3 text-center text-sm font-medium text-steel-700 hover:bg-steel-100"
-                />
-              ) : undefined
-            }
+            label={dict.nav.switchLanguage}
+            guideSlugs={guideSlugs}
+            className="text-steel-700 hover:bg-steel-100 hover:text-steel-950"
           />
+
+          {/* Visibility lives on a wrapper: the button's own `inline-flex` would
+              otherwise compete with `hidden` in the same class list, and which
+              one wins depends on stylesheet order, not on intent. */}
+          <div className="hidden sm:block">
+            <ButtonLink href={href(locale, "/contact")} className="min-h-11">
+              {dict.cta.getQuote}
+            </ButtonLink>
+          </div>
+
+          {/* On a phone the call button stays in the bar itself: one tap, no menu. */}
+          <a
+            href={telHref()}
+            aria-label={`${dict.cta.call} ${BUSINESS.phone.display}`}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-control text-steel-900 hover:bg-steel-100 lg:hidden"
+          >
+            <PhoneIcon className="h-5 w-5" />
+          </a>
+
+          <MobileMenu
+            items={items}
+            openLabel={dict.nav.openMenu}
+            closeLabel={dict.nav.closeMenu}
+            menuLabel={dict.nav.primary}
+          >
+            <ButtonLink href={href(locale, "/contact")} className="w-full">
+              {dict.cta.getQuote}
+            </ButtonLink>
+            <ActionLink variant="whatsapp" href={whatsappHref(dict.messages.general)} newTab className="w-full">
+              <WhatsAppIcon />
+              {dict.cta.chatOnWhatsapp}
+            </ActionLink>
+            <ActionLink variant="outline" href={telHref()} className="w-full">
+              <PhoneIcon />
+              <span>
+                {dict.cta.call} <span className="ltr-nums">{BUSINESS.phone.display}</span>
+              </span>
+            </ActionLink>
+          </MobileMenu>
         </div>
       </div>
     </header>

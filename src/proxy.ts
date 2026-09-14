@@ -1,145 +1,48 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { DEFAULT_LOCALE, LOCALES } from "@/lib/i18n/config";
 
 /**
- * Next.js 16 renamed `middleware` to `proxy`. Runs on the Node.js runtime.
+ * Language negotiation for the bare domain, and nothing else.
  *
- * Two responsibilities, both of which must happen before rendering:
- *   1. Locale negotiation — every page lives under /en or /ar
- *   2. Content-Security-Policy with a fresh per-request nonce
+ * Every real page lives under /en or /ar and is served straight from the CDN.
+ * The only request that needs a decision is "/", which has to go somewhere, so
+ * this sends Arabic-preferring browsers to /ar and everyone else to /en.
+ *
+ * The matcher is deliberately just "/": a proxy that ran on every request would
+ * add work in front of pages that are otherwise static files.
  */
 
-const PUBLIC_FILE = /\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico|txt|xml|json|webmanifest|woff2?)$/i;
+const LOCALES = ["en", "ar"] as const;
 
-/**
- * Paths that must NOT be locale-prefixed.
- *
- * Webhooks in particular: a payment provider posts to a fixed URL and will not
- * follow a locale redirect. Redirecting a webhook is a silent way to lose
- * payment confirmations.
- */
-const LOCALE_EXEMPT = [
-  "/api",
-  "/_next",
-  "/robots.txt",
-  "/sitemap.xml",
-  "/favicon.ico",
-  "/opensearch.xml",
-];
+function preferredLocale(request: NextRequest): (typeof LOCALES)[number] {
+  // An explicit choice made with the language switch wins over the browser.
+  const saved = request.cookies.get("hdr_locale")?.value;
+  if (saved === "en" || saved === "ar") return saved;
 
-function negotiateLocale(request: NextRequest): string {
-  // An explicit choice, stored when the user uses the language switcher, wins
-  // over the browser's header — a returning visitor should not be re-guessed.
-  const cookieLocale = request.cookies.get("hdr_locale")?.value;
-  if (cookieLocale && (LOCALES as readonly string[]).includes(cookieLocale)) {
-    return cookieLocale;
-  }
-
-  const header = request.headers.get("accept-language");
-  if (!header) return DEFAULT_LOCALE;
-
-  const preferences = header
+  const header = request.headers.get("accept-language") ?? "";
+  const ranked = header
     .split(",")
     .map((part) => {
-      const [tag, q] = part.trim().split(";q=");
-      return { tag: (tag ?? "").toLowerCase(), quality: q ? Number.parseFloat(q) : 1 };
+      const [tag = "", q] = part.trim().split(";q=");
+      return { tag: tag.toLowerCase(), quality: q ? Number.parseFloat(q) : 1 };
     })
     .sort((a, b) => b.quality - a.quality);
 
-  for (const { tag } of preferences) {
+  for (const { tag } of ranked) {
     if (tag.startsWith("ar")) return "ar";
     if (tag.startsWith("en")) return "en";
   }
-  return DEFAULT_LOCALE;
+  return "en";
 }
 
-function buildCsp(nonce: string, isDev: boolean): string {
-  return [
-    "default-src 'self'",
-    // PRODUCTION: 'strict-dynamic' means scripts loaded BY a nonced script are
-    // trusted, which is what lets Next.js load its chunks without allowlisting
-    // hosts. Host-source expressions like 'self' are then ignored entirely.
-    //
-    // DEVELOPMENT: that is exactly the problem. Turbopack's hot-reload client
-    // is served from this origin but is not nonced, so 'strict-dynamic' blocks
-    // it and hot reload silently stops working — the server keeps compiling
-    // while the browser keeps showing the previous build, which reads like a
-    // caching bug and costs an afternoon. Dropping 'strict-dynamic' in dev
-    // restores 'self', which covers those chunks. 'unsafe-eval' is also
-    // dev-only: React Refresh needs it.
-    //
-    // The nonce stays in both, so the production path is exercised in dev and
-    // the JSON-LD blocks are nonced everywhere.
-    isDev
-      ? `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`
-      : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
-    // KNOWN RESIDUAL: React writes inline style attributes, so 'unsafe-inline'
-    // stays here. It does NOT weaken script-src, which is where XSS lives.
-    // Documented in docs/SECURITY.md §5.
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self' data:",
-    "connect-src 'self'",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    "frame-src 'none'",
-    "worker-src 'self' blob:",
-    "manifest-src 'self'",
-    ...(isDev ? [] : ["upgrade-insecure-requests"]),
-  ].join("; ");
-}
-
-export function proxy(request: NextRequest): NextResponse {
-  const { pathname } = request.nextUrl;
-  const isDev = process.env.NODE_ENV === "development";
-
-  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const csp = buildCsp(nonce, isDev);
-
-  const isExempt =
-    LOCALE_EXEMPT.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)) ||
-    PUBLIC_FILE.test(pathname);
-
-  if (!isExempt) {
-    const hasLocale = LOCALES.some(
-      (locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`),
-    );
-
-    if (!hasLocale) {
-      const locale = negotiateLocale(request);
-      const url = request.nextUrl.clone();
-      url.pathname = `/${locale}${pathname === "/" ? "" : pathname}`;
-      // 307 preserves the method and body, so a POST to an unprefixed path is
-      // not silently downgraded to a GET.
-      const redirect = NextResponse.redirect(url, 307);
-      redirect.headers.set("Content-Security-Policy", csp);
-      return redirect;
-    }
-  }
-
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  // The pathname is not otherwise available to a Server Component, and layouts
-  // need it to build the hreflang alternate for the other locale.
-  requestHeaders.set("x-pathname", pathname);
-  // The query string is carried SEPARATELY and deliberately: hreflang and
-  // canonical URLs must stay query-free, but the user-facing language switch
-  // has to preserve it, or switching to Arabic mid-checkout silently discards
-  // the dates, branch and transport the customer just configured.
-  requestHeaders.set("x-search", request.nextUrl.search);
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.headers.set("Content-Security-Policy", csp);
+export function proxy(request: NextRequest) {
+  const url = request.nextUrl.clone();
+  url.pathname = `/${preferredLocale(request)}`;
+  const response = NextResponse.redirect(url, 307);
+  // The redirect depends on these request headers; caches must key on them.
+  response.headers.set("Vary", "Accept-Language, Cookie");
   return response;
 }
 
 export const config = {
-  matcher: [
-    // Everything except Next internals and static assets. Webhook routes are
-    // matched so they still receive security headers, and are exempted from
-    // the locale redirect above.
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/"],
 };

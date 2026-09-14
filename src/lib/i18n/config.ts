@@ -18,15 +18,11 @@ export const LOCALE_CONFIG: Record<
   ar: { dir: "rtl", label: "العربية", htmlLang: "ar", intlLocale: "ar-SA" },
 };
 
-export const TIMEZONE = "Asia/Riyadh";
-export const CURRENCY = "SAR";
+/** Dates are shown in Riyadh time wherever the site is built or served. */
+const TIMEZONE = "Asia/Riyadh";
 
 export function isLocale(value: string): value is Locale {
   return (LOCALES as readonly string[]).includes(value);
-}
-
-export function otherLocale(locale: Locale): Locale {
-  return locale === "en" ? "ar" : "en";
 }
 
 /**
@@ -41,33 +37,4 @@ export function formatDate(date: Date, locale: Locale, opts?: Intl.DateTimeForma
     day: "numeric",
     ...opts,
   }).format(date);
-}
-
-export function formatNumber(value: number, locale: Locale, opts?: Intl.NumberFormatOptions): string {
-  return new Intl.NumberFormat(LOCALE_CONFIG[locale].intlLocale, opts).format(value);
-}
-
-/**
- * Format a rated capacity for display.
- *
- * Tonnes above a tonne, kilograms below it. The fleet spans a 300 t crawler
- * crane and a 150 kg dewatering pump, and dividing everything by 1000 renders
- * the small machines as "0.15 t" — a number that reads as "almost nothing"
- * rather than as a capacity, and that no one in this industry would write.
- */
-export function formatCapacity(capacityKg: number, locale: Locale): string {
-  return capacityKg < 1000
-    ? `${formatNumber(capacityKg, locale)} kg`
-    : `${formatNumber(capacityKg / 1000, locale)} t`;
-}
-
-/** Build a locale-prefixed path. Every internal link goes through this. */
-export function localePath(locale: Locale, path: string): string {
-  const clean = path.startsWith("/") ? path : `/${path}`;
-  return `/${locale}${clean === "/" ? "" : clean}`;
-}
-
-/** ISO date (YYYY-MM-DD) for form inputs and URLs — never localised. */
-export function toISODate(date: Date): string {
-  return date.toISOString().slice(0, 10);
 }

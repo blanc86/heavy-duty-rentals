@@ -39,7 +39,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SCAN_DIRS = ["src/lib", "src/components"];
+const SCAN_DIRS = ["src/lib", "src/components", "src/content"];
 const SEARCH_DIRS = ["src", "scripts", "tests"];
 
 /**
@@ -51,10 +51,9 @@ const SEARCH_DIRS = ["src", "scripts", "tests"];
 const ALLOWED = new Map([
   ["proxy", "Next.js proxy entry point, invoked by the framework"],
   ["config", "Next.js proxy matcher, read by the framework"],
-  ["register", "instrumentation hook, invoked by Next.js at boot"],
 ]);
 
-const SKIP_FILES = [/\/app\//, /\.d\.ts$/, /\/schema\//];
+const SKIP_FILES = [/\/app\//, /\.d\.ts$/];
 
 async function walk(dir) {
   const out = [];

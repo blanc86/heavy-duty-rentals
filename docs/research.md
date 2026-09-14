@@ -1,5 +1,14 @@
 # Research Report — Heavy Equipment Rental Platform for Saudi Arabia
 
+> **Superseded in part (2026-09-14).** This report argued for an online booking
+> and payment platform, and that platform was built. It has since been replaced
+> by a lead-generation site built around phone, WhatsApp and quote requests; see
+> [REDESIGN.md](REDESIGN.md) for why. The market, taxonomy and competitor
+> findings below still informed the redesign. The sections on payments,
+> e-invoicing and booking architecture describe the previous platform, which is
+> preserved at the git tag `booking-platform-final`, along with the documents
+> this report refers to (`ARCHITECTURE.md`, `SECURITY.md`, `FINAL_REVIEW.md`).
+
 **Date:** 2026-09-02
 **Status:** Desk research. Every regulatory item below **must be verified with qualified Saudi legal, tax and cybersecurity advisors before production launch.** Nothing here is legal advice.
 

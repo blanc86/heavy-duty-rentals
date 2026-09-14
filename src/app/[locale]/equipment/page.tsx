@@ -1,355 +1,106 @@
 import type { Metadata } from "next";
-import { cspNonce } from "@/lib/seo/nonce";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CompareTray } from "@/components/equipment/compare-tray";
-import { EquipmentCard } from "@/components/equipment/equipment-card";
-import { FilterPanel } from "@/components/equipment/filter-panel";
-import { Alert, Container, EmptyState, Input, SectionHeading, Select } from "@/components/ui";
-import { countAvailableUnits, occupiedPeriod } from "@/lib/availability";
-import { listBranches, listManufacturers, searchClasses } from "@/lib/catalog/repository";
+import { MachineCard } from "@/components/equipment/machine-card";
+import { ContactBand, PageHeader } from "@/components/marketing/sections";
+import { JsonLd } from "@/components/seo/json-ld";
+import { Container } from "@/components/ui";
+import { activeCategories, categoryPath, machineCount, machinePath, machinesIn } from "@/lib/catalog";
 import { getDictionary } from "@/lib/i18n";
-import { formatNumber, isLocale, localePath, toISODate, type Locale } from "@/lib/i18n/config";
-import { breadcrumbJsonLd } from "@/lib/seo/json-ld";
+import { isLocale, type Locale } from "@/lib/i18n/config";
+import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo/json-ld";
+import { alternates, href } from "@/lib/site";
 
-type SearchParams = Record<string, string | string[] | undefined>;
-
-function one(params: SearchParams, key: string): string | undefined {
-  const value = params[key];
-  const single = Array.isArray(value) ? value[0] : value;
-  return single && single.trim().length > 0 ? single.trim() : undefined;
-}
-
-/** Parse a YYYY-MM-DD form value into a UTC date, rejecting anything malformed. */
-function parseDate(value: string | undefined): Date | null {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-export async function generateMetadata({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ locale: string }>;
-  searchParams: Promise<SearchParams>;
-}): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
-  const sp = await searchParams;
   if (!isLocale(locale)) return {};
   const dict = getDictionary(locale);
-  const query = one(sp, "q");
-
   return {
-    title: query ? `${dict.equipment.resultsFor} "${query}"` : dict.equipment.allEquipment,
-    description: dict.home.heroSubtitle,
-    alternates: {
-      canonical: `/${locale}/equipment`,
-      languages: { en: "/en/equipment", ar: "/ar/equipment", "x-default": "/en/equipment" },
-    },
-    // A filtered or paginated listing is not a distinct landing page. Letting
-    // Google index every filter permutation is how a catalogue turns into
-    // thousands of near-duplicate URLs.
-    robots: Object.keys(sp).length > 0 ? { index: false, follow: true } : undefined,
+    title: dict.meta.equipmentTitle,
+    description: dict.meta.equipmentDescription,
+    alternates: alternates(locale, "/equipment"),
+    openGraph: { title: dict.meta.equipmentTitle, description: dict.meta.equipmentDescription },
   };
 }
 
-export default async function EquipmentListingPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ locale: string }>;
-  searchParams: Promise<SearchParams>;
-}) {
-  const { locale: rawLocale } = await params;
-  const sp = await searchParams;
-  if (!isLocale(rawLocale)) notFound();
-  const locale: Locale = rawLocale;
+/**
+ * Every machine, grouped by category, with a jump bar.
+ *
+ * No client-side filter: fourteen categories and eighteen machines fit on one
+ * scrollable page, and anchor links do the job a filter widget would — with no
+ * JavaScript, and with every machine present in the HTML for search engines.
+ */
+export default async function EquipmentPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale: raw } = await params;
+  if (!isLocale(raw)) notFound();
+  const locale: Locale = raw;
   const dict = getDictionary(locale);
-
-  const query = one(sp, "q");
-  const branchSlug = one(sp, "branch");
-  const manufacturer = one(sp, "manufacturer");
-  const sort = one(sp, "sort") as "relevance" | "price_asc" | "price_desc" | "capacity" | undefined;
-  const page = Number.parseInt(one(sp, "page") ?? "1", 10) || 1;
-
-  // Capacity filters are entered in tonnes but stored in kilograms.
-  const minCapacityT = Number.parseFloat(one(sp, "minCapacity") ?? "");
-  const maxCapacityT = Number.parseFloat(one(sp, "maxCapacity") ?? "");
-
-  const startDate = parseDate(one(sp, "start"));
-  const endDate = parseDate(one(sp, "end"));
-  const hasDateRange = startDate !== null && endDate !== null && startDate < endDate;
-
-  const [results, branches, manufacturers] = await Promise.all([
-    searchClasses({
-      locale,
-      query,
-      branchSlug,
-      manufacturer,
-      minCapacityKg: Number.isFinite(minCapacityT) ? minCapacityT * 1000 : undefined,
-      maxCapacityKg: Number.isFinite(maxCapacityT) ? maxCapacityT * 1000 : undefined,
-      operatorAvailable: one(sp, "operator") === "1",
-      sort,
-      page,
-    }),
-    listBranches(locale),
-    listManufacturers(),
-  ]);
-
-  /**
-   * When dates are supplied, resolve REAL availability per class.
-   *
-   * This is the point of the whole system: the buyer's actual question is "is
-   * it free on my dates", and every competitor answers it with a phone call.
-   * Resolved in parallel so a 24-card page stays fast.
-   */
-  const availability = new Map<string, number>();
-  if (hasDateRange) {
-    const counts = await Promise.all(
-      results.items.map(async (item) => {
-        const period = occupiedPeriod(startDate, endDate, 0, 0);
-        const count = await countAvailableUnits({
-          classId: item.id,
-          period,
-          branchId: undefined,
-        });
-        return [item.id, count] as const;
-      }),
-    );
-    for (const [id, count] of counts) availability.set(id, count);
-  }
-
-  const carriedParams = new URLSearchParams();
-  if (startDate) carriedParams.set("start", toISODate(startDate));
-  if (endDate) carriedParams.set("end", toISODate(endDate));
-  const carried = carriedParams.toString();
-
-  const totalPages = Math.max(1, Math.ceil(results.total / results.perPage));
+  const categories = activeCategories();
+  const crumbs = [
+    { name: dict.common.home, path: "/" },
+    { name: dict.nav.equipment, path: "/equipment" },
+  ];
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        // CSP applies to every <script>, including a ld+json data block that
-        // never executes. Without the nonce the block is refused and a crawler
-        // rendering under CSP never sees the structured data — silently, since
-        // the markup is still present in the HTML source.
-        nonce={await cspNonce()}
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
-            breadcrumbJsonLd([
-              { name: dict.nav.home, path: `/${locale}` },
-              { name: dict.equipment.title, path: `/${locale}/equipment` },
-            ]),
-          ),
-        }}
-      />
+      <PageHeader locale={locale} dict={dict} crumbs={crumbs} title={dict.equipment.indexTitle} intro={dict.equipment.indexIntro} />
 
-      <Container className="py-6 sm:py-10">
-        <SectionHeading
-          level={1}
-          title={query ? `${dict.equipment.resultsFor} "${query}"` : dict.equipment.allEquipment}
-          description={
-            hasDateRange
-              ? undefined
-              : locale === "ar"
-                ? "أضف تواريخ الإيجار لعرض التوفر الفعلي لكل معدة."
-                : "Add your rental dates to see real availability for every machine."
-          }
-        />
-
-        {/* Date range: the single most valuable control on the page, so it
-            sits above the results rather than inside a collapsed filter panel. */}
-        <form
-          method="get"
-          className="mb-6 rounded-[--radius-card] border border-steel-200 bg-white p-4"
-        >
-          {query && <input type="hidden" name="q" value={query} />}
-          {branchSlug && <input type="hidden" name="branch" value={branchSlug} />}
-          {manufacturer && <input type="hidden" name="manufacturer" value={manufacturer} />}
-
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-            <div>
-              <label htmlFor="start" className="mb-1.5 block text-sm font-medium text-steel-800">
-                {dict.booking.startDate}
-              </label>
-              <Input
-                id="start"
-                name="start"
-                type="date"
-                defaultValue={startDate ? toISODate(startDate) : ""}
-                min={toISODate(new Date())}
-                className="numeric-latin"
-              />
-            </div>
-            <div>
-              <label htmlFor="end" className="mb-1.5 block text-sm font-medium text-steel-800">
-                {dict.booking.endDate}
-              </label>
-              <Input
-                id="end"
-                name="end"
-                type="date"
-                defaultValue={endDate ? toISODate(endDate) : ""}
-                min={toISODate(new Date())}
-                className="numeric-latin"
-              />
-            </div>
-            <button
-              type="submit"
-              className="min-h-[2.75rem] rounded-[--radius-control] bg-amber-500 px-5 text-sm font-semibold text-steel-950 hover:bg-amber-400"
-            >
-              {dict.equipment.checkAvailability}
-            </button>
-          </div>
-        </form>
-
-        <div className="grid gap-6 lg:grid-cols-[16rem_1fr]">
-          <aside className="lg:sticky lg:top-20 lg:self-start">
-            <details open className="lg:open">
-              <summary className="mb-3 cursor-pointer list-none rounded-[--radius-control] border border-steel-300 px-4 py-2.5 text-sm font-semibold text-steel-900 lg:hidden">
-                {dict.filters.title}
-              </summary>
-              <div className="rounded-[--radius-card] border border-steel-200 bg-white p-4">
-                <FilterPanel
-                  locale={locale}
-                  dict={dict}
-                  filters={[
-                    {
-                      key: "capacityKg",
-                      labelEn: "Capacity",
-                      labelAr: "الحمولة",
-                      type: "range",
-                      unit: "t",
-                      step: 1,
-                      sortOrder: 1,
-                    },
-                  ]}
-                  manufacturers={manufacturers}
-                  branches={branches}
-                  current={{
-                    q: query,
-                    branch: branchSlug,
-                    manufacturer,
-                    minCapacity: one(sp, "minCapacity"),
-                    maxCapacity: one(sp, "maxCapacity"),
-                    operator: one(sp, "operator"),
-                    start: startDate ? toISODate(startDate) : undefined,
-                    end: endDate ? toISODate(endDate) : undefined,
-                  }}
-                />
-              </div>
-            </details>
-          </aside>
-
-          <div>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-steel-600">
-                <span className="font-semibold text-steel-900 numeric-latin">
-                  {formatNumber(results.total, locale)}
-                </span>{" "}
-                {dict.common.results}
-              </p>
-
-              <form method="get" className="flex items-center gap-2">
-                {query && <input type="hidden" name="q" value={query} />}
-                {branchSlug && <input type="hidden" name="branch" value={branchSlug} />}
-                {startDate && <input type="hidden" name="start" value={toISODate(startDate)} />}
-                {endDate && <input type="hidden" name="end" value={toISODate(endDate)} />}
-                <label htmlFor="sort" className="text-sm text-steel-600">
-                  {dict.equipment.sortBy}
-                </label>
-                <Select id="sort" name="sort" defaultValue={sort ?? "relevance"} className="w-auto">
-                  <option value="relevance">{dict.equipment.sortRelevance}</option>
-                  <option value="price_asc">{dict.equipment.sortPriceLow}</option>
-                  <option value="price_desc">{dict.equipment.sortPriceHigh}</option>
-                  <option value="capacity">{dict.equipment.sortCapacity}</option>
-                </Select>
-                <button
-                  type="submit"
-                  className="min-h-[2.75rem] rounded-[--radius-control] border border-steel-300 px-3 text-sm font-medium text-steel-700 hover:bg-steel-100"
+      <nav aria-label={dict.equipment.jumpTo} className="sticky top-16 z-30 border-b border-steel-200 bg-white/95 backdrop-blur lg:top-[4.5rem]">
+        <Container>
+          <ul className="-mx-2 flex gap-1 overflow-x-auto py-2.5 [scrollbar-width:none]">
+            {categories.map((category) => (
+              <li key={category.slug} className="shrink-0">
+                <a
+                  href={`#${category.slug}`}
+                  className="inline-flex min-h-10 items-center rounded-full px-3.5 text-[0.95rem] font-semibold whitespace-nowrap text-steel-700 hover:bg-steel-100 hover:text-steel-950"
                 >
-                  {dict.common.apply}
-                </button>
-              </form>
-            </div>
+                  {category.name[locale]}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Container>
+      </nav>
 
-            {results.items.length === 0 ? (
-              <EmptyState
-                title={dict.filters.noMatch}
-                description={
-                  locale === "ar"
-                    ? "جرّب توسيع نطاق الحمولة أو إزالة بعض عوامل التصفية."
-                    : "Try widening the capacity range or removing some filters."
-                }
-                action={
-                  <Link
-                    href={localePath(locale, "/equipment")}
-                    className="text-sm font-medium text-steel-800 underline"
-                  >
-                    {dict.filters.resetFilters}
+      <Container className="py-12 sm:py-16">
+        {categories.map((category) => {
+          const machines = machinesIn(category.slug);
+          return (
+            <section key={category.slug} id={category.slug} aria-labelledby={`${category.slug}-title`} className="scroll-mt-36 border-b border-steel-200 py-12 first:pt-0 last:border-0">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
+                <h2 id={`${category.slug}-title`} className="text-h2">
+                  <Link href={href(locale, categoryPath(category))} className="hover:underline underline-offset-4">
+                    {category.name[locale]}
                   </Link>
-                }
-              />
-            ) : (
-              <>
-                <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {results.items.map((item) => (
-                    <li key={item.id} className="relative">
-                      <EquipmentCard
-                        item={item}
-                        locale={locale}
-                        dict={dict}
-                        availableUnits={hasDateRange ? (availability.get(item.id) ?? 0) : undefined}
-                        searchParams={carried || undefined}
-                      />
-                    </li>
-                  ))}
-                </ul>
-
-                {totalPages > 1 && (
-                  <nav aria-label={dict.a11y.pagination} className="mt-8 flex justify-center gap-2">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => {
-                      const pageParams = new URLSearchParams(
-                        Object.entries(sp).flatMap(([k, v]) =>
-                          v === undefined ? [] : [[k, Array.isArray(v) ? (v[0] ?? "") : v]],
-                        ),
-                      );
-                      pageParams.set("page", String(n));
-                      return (
-                        <Link
-                          key={n}
-                          href={`${localePath(locale, "/equipment")}?${pageParams.toString()}`}
-                          aria-current={n === page ? "page" : undefined}
-                          className={
-                            n === page
-                              ? "grid h-10 min-w-10 place-items-center rounded-[--radius-control] bg-steel-900 px-3 text-sm font-semibold text-white numeric-latin"
-                              : "grid h-10 min-w-10 place-items-center rounded-[--radius-control] border border-steel-300 px-3 text-sm text-steel-700 hover:bg-steel-100 numeric-latin"
-                          }
-                        >
-                          {formatNumber(n, locale)}
-                        </Link>
-                      );
-                    })}
-                  </nav>
-                )}
-              </>
-            )}
-
-            {!hasDateRange && results.items.length > 0 && (
-              <Alert tone="info" className="mt-6">
-                {locale === "ar"
-                  ? "التوفر يُعرض بعد إدخال تواريخ الإيجار. كل معدة وحدة فعلية لها جدول توفر خاص بها."
-                  : "Availability appears once you enter rental dates. Every machine is a real unit with its own calendar."}
-              </Alert>
-            )}
-          </div>
-        </div>
+                </h2>
+                <p className="text-steel-600">{machineCount(machines.length, locale)}</p>
+              </div>
+              <p className="mt-2 max-w-2xl text-steel-700">{category.summary[locale]}</p>
+              <ul className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {machines.map((machine) => (
+                  <li key={machine.slug} className="flex">
+                    <MachineCard machine={machine} locale={locale} dict={dict} className="w-full" />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
       </Container>
 
-      {/* Fixed-position tray; renders nothing until two machines are picked. */}
-      <CompareTray locale={locale} dict={dict} />
+      <ContactBand locale={locale} dict={dict} />
+
+      <JsonLd
+        data={[
+          breadcrumbJsonLd(locale, crumbs),
+          itemListJsonLd(
+            locale,
+            categories.flatMap((category) =>
+              machinesIn(category.slug).map((machine) => ({ name: machine.name[locale], path: machinePath(machine) })),
+            ),
+          ),
+        ]}
+      />
     </>
   );
 }

@@ -1,227 +1,112 @@
 # Deploying
 
-Written against Vercel + Neon, which is what this is deployed on. Nothing here
-is Vercel-specific except where it says so; the constraints are the app's.
+The site is fully static: every page is generated at build time and served from
+a CDN. There is no database, no API and no server-side secret. It is deployed on
+Vercel, but any host that runs `next start` or serves a Next.js build will do.
 
 ---
 
-## 1. What the platform has to provide
+## 1. Before the first public launch
 
-**Postgres with `btree_gist`.** Not optional and not a preference. The promise
-that a machine cannot be double-booked is a GiST exclusion constraint over a
-`tstzrange`, enforced by the database. Without the extension the migration fails
-and the guarantee does not exist. Neon, Supabase and RDS all have it; several
-"serverless Postgres" products do not.
-
-**A connection pooler, if the app is serverless.** Each concurrent invocation is
-its own process with its own pool, so a direct connection string exhausts
-`max_connections` under very little load. Use the pooled endpoint, set
-`DATABASE_POOL_MAX=1`, and set `DATABASE_TRANSACTION_POOLER=true` — PgBouncer in
-transaction mode hands a different backend connection to each transaction, so
-prepared statements are not there on the next one. That failure is intermittent
-and concurrency-dependent, which is the worst way to discover it.
-
-**More than one instance? Then a shared rate limiter.** See §3.
+1. **Fill in the business details.** `npm run content:check` lists every
+   placeholder still in `src/content/business.ts`. Placeholders are visibly fake
+   (`+966 5X XXX XXXX`, `info@example.com`) — do not launch with any of them.
+2. **Set the real domain** in `NEXT_PUBLIC_SITE_URL` (§2).
+3. **Have the privacy policy and terms reviewed** (`src/content/legal.ts`) by a
+   Saudi lawyer.
+4. **Replace the illustrative photographs** with the business's own — see
+   [REDESIGN.md §6](REDESIGN.md#6-images).
 
 ---
 
 ## 2. Environment
 
-Every variable is documented in `.env.example`. The ones that are wrong by
-default on a hosted deployment:
+One variable:
 
-| Variable | Local | Hosted | Why |
-|---|---|---|---|
-| `DATABASE_POOL_MAX` | `10` | `1` on serverless | Each invocation holds its own pool |
-| `DATABASE_TRANSACTION_POOLER` | `false` | `true` behind PgBouncer | Prepared statements break otherwise |
-| `RATE_LIMIT_BACKEND` | `memory` | `postgres` | §3 |
-| `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` | unset | **must be set** | §4 |
-| `APP_URL` / `NEXT_PUBLIC_APP_URL` | localhost | the real origin | CSRF origin check, payment return URLs, canonical tags |
+| Variable | Example | Used for |
+|---|---|---|
+| `NEXT_PUBLIC_SITE_URL` | `https://www.example.sa` | Canonical URLs, `hreflang`, the sitemap, Open Graph, structured data |
 
-`ENCRYPTION_KEY` and `APP_SECRET` are refused at boot if absent in production.
-Generate each with:
+It is read **at build time**, so changing it needs a new deployment, not just a
+restart. Unset, it falls back to `https://heavy-duty-rentals.vercel.app`.
+
+Set it without a trailing slash, and set it to the domain visitors actually land
+on. If `example.sa` redirects to `www.example.sa`, use the `www` form, or every
+canonical tag points at a redirect.
+
+### Left over from the booking platform
+
+The Vercel project still has the booking platform's environment variables
+(`DATABASE_URL` and the `EU_*` Neon variables, `ENCRYPTION_KEY`, `APP_SECRET`,
+`PAYMENT_PROVIDER`, `DEMO_MODE`, `EMAIL_FROM` and so on) and the Neon database it
+used. Nothing reads them any more. They can be deleted, along with the database,
+once nobody needs the old platform's data — the code is preserved at the
+`booking-platform-final` tag.
+
+---
+
+## 3. Deploy
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+npx vercel deploy --prod
 ```
 
-`DATABASE_URL` must contain `sslmode=require`. The boot check enforces the
-string; customer PII must not cross a network in the clear.
+`vercel.json` pins functions to Frankfurt (`fra1`). Pages are static and served
+from the edge nearest the visitor regardless; the only code that runs in a
+region is `src/proxy.ts`, which redirects the bare `/` to `/en` or `/ar`.
+
+Automatic deploys from GitHub need the Vercel GitHub app installed on the
+repository, which only the repository owner can do: Vercel dashboard → the
+project → Settings → Git → Connect.
 
 ---
 
-## 3. Rate limiting will silently stop working if you skip this
+## 4. Verify the deployment, not just the build
 
-`RATE_LIMIT_BACKEND=memory` keeps counters in a `Map` in one process. On
-serverless, every cold start begins with an empty map and concurrent
-invocations each keep their own — so login throttling and the booking-lookup
-throttle stop existing under exactly the load they defend against. Nothing
-errors. The control just is not there.
-
-Set `RATE_LIMIT_BACKEND=postgres`. It uses the `rate_limit_bucket` table, which
-already exists from the first migration.
-
----
-
-## 4. Server Actions across instances
-
-Next.js encrypts the values captured in a Server Action's closure. Unset,
-each instance generates its own key, so a request served by a different instance
-than the one that rendered the page cannot decrypt the action reference and the
-form breaks — intermittently, in proportion to how many instances are running.
-
-Set `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` to a stable base64 32-byte value, the
-same across every instance, and keep it stable across deploys.
-
----
-
-## 5. Deploying without a payment provider
-
-`assertProductionReady` refuses to boot with `PAYMENT_PROVIDER=mock`, because a
-deployment that takes bookings and settles nothing is worse than one that is
-down.
-
-The one escape is `DEMO_MODE=true`. It permits the mock provider **and** puts
-"no real payments are processed" above the header on every page in both
-languages. The label and the permission are the same switch on purpose: you
-cannot have a payment-less deployment that does not say so. Startup logs it too,
-so an operator who inherits the deployment learns it from the logs rather than
-from a customer.
-
-`DEMO_MODE=true` alongside a real provider is refused — the banner would be
-lying while cards were genuinely charged.
-
-To go live for real: get a SAMA-licensed PSP, set `PAYMENT_PROVIDER=moyasar`
-with its three keys, set `DEMO_MODE=false`, and re-verify the webhook signature
-path against the provider's sandbox first.
-
----
-
-## 6. Order of operations
-
-The order matters — the role grant covers `ALL TABLES IN SCHEMA public` as they
-exist when it runs, so it must come after the migrations.
+A green build says the pages compiled. These say the site works:
 
 ```bash
-DATABASE_URL="<pooled url>" npm run db:migrate
-DATABASE_URL="<pooled url>" npm run db:grant
-DATABASE_URL="<pooled url>" npm run db:seed
+APP_URL="https://<host>" npm run verify:routes
 ```
-
-`db:seed` refuses to run with the development bootstrap password when
-`NODE_ENV=production`. Set `SEED_ADMIN_EMAIL` and a real `SEED_ADMIN_PASSWORD`.
-
-Then deploy:
 
 ```bash
-vercel --prod
+APP_URL="https://<host>" npm run verify:a11y
 ```
+
+`verify:routes` crawls every URL in the sitemap and checks titles, descriptions,
+canonicals, `hreflang`, structured data, every internal link and image, the
+format of every `tel:`, WhatsApp and `mailto:` link, the legacy redirects and the
+security headers.
+
+`verify:a11y` runs axe (WCAG 2.2 A and AA) on each template in both languages at
+desktop and phone sizes, and checks horizontal overflow, console errors, reduced
+motion, the mobile menu's focus trap and the quote form.
+
+`verify:a11y` needs Chromium: `npx playwright install chromium` once.
 
 ---
 
-## 7. Verifying a deployment, not just building it
+## 5. Headers and caching
 
-A green build says the bundle compiled. These say the application works:
+Set in `next.config.ts`, so they travel with the code to any host:
 
-```bash
-APP_URL="https://<host>" node scripts/verify-routes.mjs   # every page + link resolves
-APP_URL="https://<host>" node scripts/verify-flow.mjs     # pricing, CSRF, webhook signatures
-APP_URL="https://<host>" node scripts/pentest.mjs         # IDOR, escalation, headers, guest access
-APP_URL="https://<host>" node scripts/verify-a11y.mjs     # WCAG 2.2 A/AA, both locales
-```
-
-The scripts that touch the database need `DATABASE_URL` pointed at the same one
-the deployment uses — and they need OWNER rights to build their fixtures, which
-is a different role from the one the app runs as (§8). Set `APP_DATABASE_ROLE`
-so the pen test reports on the app's role rather than its own, and
-`SEED_ADMIN_EMAIL` so it can find the admin fixture:
-
-```bash
-APP_URL="https://<host>" DATABASE_URL="<owner url>" APP_DATABASE_ROLE=hdr_app SEED_ADMIN_EMAIL="<your admin>" node scripts/pentest.mjs
-```
-
-**Things that only break on a real deployment.** `next dev` renders everything
-dynamically and the scripts default to local conventions, so these three passed
-every local check and still failed in production: a route declaring
-`generateStaticParams` while the layout reads `cookies()` (500s on cold
-requests, and the unhandled rejection exits the process); the mock checkout
-refusing to serve under `NODE_ENV=production`; and the scripts using the
-development session cookie name, which makes them authenticate as nobody and
-report false breaches. Point the scripts at the deployment, not just at
-localhost.
+- **Content-Security-Policy** without a nonce. A nonce would force every page to
+  render per request, which is exactly what a static site avoids. So scripts are
+  limited to the site's own origin plus inline scripts, which Next.js needs to
+  hydrate a static page.
+- **HSTS, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy,
+  Permissions-Policy, COOP.**
+- **`/images/*` is cached for a year, immutable.** That is safe only because
+  every image file name carries a hash of its content; `npm run images:prepare`
+  gives a changed photo a new name. Never replace a file in `public/images` by
+  hand under the same name.
 
 ---
 
-## 8. Which database role the app connects as
+## 6. Old URLs
 
-Provisioning `hdr_app` is not the same as using it. Migrations run as the owner;
-the **application** should connect as `hdr_app`, which holds SELECT/INSERT on the
-append-only tables and no UPDATE or DELETE. That is what makes "the audit log
-cannot be rewritten" a control rather than a note — an UPDATE is refused with
-`permission denied for table audit_log`.
-
-`db:grant` creates the role NOLOGIN. To use it:
-
-```sql
-ALTER ROLE hdr_app WITH LOGIN PASSWORD '<generated>';
-```
-
-Then point `DATABASE_URL` at that role and keep the owner's URL for migrations.
-Exercise it before switching — read the catalogue, write a booking, append an
-audit row — because a role that cannot write audit entries fails every guarded
-request.
-
-On Vercel + Neon, note that the Neon integration owns `DATABASE_URL`. If it
-re-syncs, it overwrites this with the owner's connection string and the app
-silently returns to running as owner. Re-check §11 of the pen test after any
-change to the integration.
-
----
-
-## 9. Email
-
-Booking confirmations are sent from the **verified webhook path**, the moment a
-payment is captured and the booking actually moves to `confirmed`. Gating on the
-transition rather than on the webhook matters: providers retry, and `moved` is
-false on a replay, so a customer gets exactly one confirmation however many
-times the event arrives.
-
-Two rules the code holds to:
-
-- **A send never fails the thing it reports on.** The card is already charged
-  and the machine reserved by then. An unreachable mail API must not turn that
-  into a 500 that makes the provider retry a webhook it already delivered.
-- **Every attempt leaves a row** in `notification`, `queued` -> `sent` /
-  `failed` / `suppressed`. `suppressed` means no transport is configured, which
-  is not the same as a delivery failure — distinguishing them is what stops "no
-  email configured" being investigated as a bug for a week. The row stores
-  template variables, never the rendered body, which is full of PII.
-
-To actually send, set `EMAIL_PROVIDER=resend` and `RESEND_API_KEY`. **A verified
-sending domain is required** to reach anyone other than the account holder —
-without it Resend accepts mail to your own address and rejects every customer,
-so it works in testing and fails in production. `EMAIL_FROM` must be on that
-domain. A `.vercel.app` host cannot be verified; this needs a real domain with
-DNS access.
-
-Until then `EMAIL_PROVIDER=console` logs the message, records the row as
-`suppressed`, and the confirmation page does **not** claim an email was sent —
-that line is gated on the provider genuinely delivering.
-
----
-
-## 10. Known operational gaps
-
-These are honest gaps, not oversights, and each is named in
-`docs/FINAL_REVIEW.md` with a next step:
-
-- **No email or SMS.** Nothing is sent to customers. The booking reference shown
-  on the confirmation page is the only way back into a booking, which is why
-  that page tells the customer to save it.
-- **No object storage driver.** `STORAGE_PROVIDER=s3` is refused at boot.
-- **No ZATCA Phase 2 clearance.** Invoices are issued locally and labelled as
-  not cleared. `TAX_INVOICE_PROVIDER=zatca` is refused at boot.
-- **No account creation.** Customers do not have accounts by design; staff and
-  business accounts are seeded, because onboarding one securely needs a
-  set-your-password link delivered to a proven address, and there is no email
-  transport to deliver it with.
+The booking platform's URLs (`/book`, `/booking/*`, `/login`, `/account`,
+`/admin`, `/quote`, `/compare`, `/equipment/item/*` and others) permanently
+redirect (308) to their nearest equivalent, so bookmarks and any indexed links
+still land somewhere useful. The list is `legacyRedirects()` in `next.config.ts`;
+`verify:routes` checks it.

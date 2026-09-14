@@ -1,60 +1,60 @@
-import type { Metadata } from "next";
-import { headers } from "next/headers";
+import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
+import { barlow, barlowCondensed, plexArabic } from "@/app/fonts";
+import { ContactDock } from "@/components/layout/contact-dock";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
-import { getFullActor } from "@/lib/auth/session";
-import { env } from "@/lib/env";
+import { JsonLd } from "@/components/seo/json-ld";
+import { BUSINESS } from "@/content/business";
 import { getDictionary } from "@/lib/i18n";
 import { LOCALE_CONFIG, LOCALES, isLocale, type Locale } from "@/lib/i18n/config";
-import { getBusinessSettings } from "@/lib/settings";
+import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/json-ld";
+import { SITE_URL } from "@/lib/site";
+
+/**
+ * Every page on the site is generated at build time for both languages and
+ * served from the CDN. Nothing here reads cookies, headers or a database, which
+ * is what keeps it static — and what makes the first byte arrive in tens of
+ * milliseconds instead of waiting on a server.
+ */
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return LOCALES.map((locale) => ({ locale }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ locale: string }>;
-}): Promise<Metadata> {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#1b2430",
+};
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
-
   const dict = getDictionary(locale);
-  const business = await getBusinessSettings();
-  const name = locale === "ar" ? business.companyNameAr : business.companyNameEn;
+  const name = BUSINESS.name[locale];
 
   return {
-    metadataBase: new URL(env.APP_URL),
-    title: {
-      default: `${name} — ${dict.meta.tagline}`,
-      template: `%s | ${name}`,
-    },
-    description: dict.meta.tagline,
-    // Both locales are declared as alternates on every page, plus x-default,
-    // so Google can serve the right language for an Arabic query — which every
-    // competitor currently forfeits (docs/research.md §10).
-    alternates: {
-      languages: {
-        en: "/en",
-        ar: "/ar",
-        "x-default": "/en",
-      },
-    },
+    metadataBase: new URL(SITE_URL),
+    title: { default: `${dict.meta.homeTitle}`, template: `%s | ${name}` },
+    description: dict.meta.homeDescription,
+    applicationName: name,
     openGraph: {
       type: "website",
       siteName: name,
       locale: locale === "ar" ? "ar_SA" : "en_SA",
       alternateLocale: locale === "ar" ? "en_SA" : "ar_SA",
+      images: [{ url: "/og/default.jpg", width: 1200, height: 630, alt: dict.meta.tagline }],
     },
-    twitter: { card: "summary_large_image" },
+    twitter: { card: "summary_large_image", images: ["/og/default.jpg"] },
     robots: {
       index: true,
       follow: true,
-      googleBot: { index: true, follow: true, "max-image-preview": "large" },
+      googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
     },
+    formatDetection: { telephone: false, email: false, address: false },
   };
 }
 
@@ -68,44 +68,28 @@ export default async function LocaleLayout({
   const { locale: raw } = await params;
   if (!isLocale(raw)) notFound();
   const locale: Locale = raw;
-
   const dict = getDictionary(locale);
   const config = LOCALE_CONFIG[locale];
-  const [actor, business, requestHeaders] = await Promise.all([
-    getFullActor(),
-    getBusinessSettings(),
-    headers(),
-  ]);
-
-  const pathname = requestHeaders.get("x-pathname") ?? `/${locale}`;
-  // Only the language switch uses this — never the canonical/hreflang tags.
-  const search = requestHeaders.get("x-search") ?? "";
 
   return (
-    // `lang` and `dir` are set here, on the server, in the first bytes of HTML.
-    // Setting them client-side would flash an LTR layout at Arabic users and
-    // give assistive technology the wrong language for the initial parse.
-    <html lang={config.htmlLang} dir={config.dir} suppressHydrationWarning>
-      <body className="flex min-h-dvh flex-col">
+    <html
+      lang={config.htmlLang}
+      dir={config.dir}
+      className={`${barlow.variable} ${barlowCondensed.variable} ${plexArabic.variable}`}
+    >
+      {/* Bottom padding on phones equals the contact bar's height, so the bar
+          never sits on top of the footer or the last lines of a page. */}
+      <body className="flex min-h-dvh flex-col pb-[calc(3.75rem+env(safe-area-inset-bottom))] md:pb-0">
         <a href="#main" className="skip-link">
           {dict.nav.skipToContent}
         </a>
-
-        {env.DEMO_MODE && (
-          <div className="bg-steel-900 px-4 py-1.5 text-center text-2xs text-steel-200 sm:text-xs">
-            {locale === "ar"
-              ? "بيئة تجريبية — جميع المعدات والأسعار بيانات توضيحية فقط، ولا تتم أي عمليات دفع حقيقية."
-              : "Demo environment — all equipment and prices are illustrative sample data. No real payments are processed."}
-          </div>
-        )}
-
-        <SiteHeader locale={locale} dict={dict} actor={actor} pathname={pathname} search={search} />
-
+        <SiteHeader locale={locale} dict={dict} />
         <main id="main" className="flex-1">
           {children}
         </main>
-
-        <SiteFooter locale={locale} dict={dict} business={business} />
+        <SiteFooter locale={locale} dict={dict} />
+        <ContactDock locale={locale} dict={dict} />
+        <JsonLd data={[organizationJsonLd(locale), websiteJsonLd(locale)]} />
       </body>
     </html>
   );

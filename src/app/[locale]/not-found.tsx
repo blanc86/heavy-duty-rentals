@@ -1,48 +1,51 @@
 import Link from "next/link";
-import { Container } from "@/components/ui";
+import { ButtonLink, Container } from "@/components/ui";
+import { ar } from "@/lib/i18n/dictionaries/ar";
 import { en } from "@/lib/i18n/dictionaries/en";
 
 /**
- * Locale-scoped 404.
+ * 404 inside a locale.
  *
- * A Server Component that cannot read route params (Next renders not-found
- * outside the param context), so it uses the English dictionary and offers both
- * locales as escape routes rather than guessing wrong.
- *
- * It offers real onward paths — search and categories — because a 404 reached
- * from a stale search result should still be able to convert.
+ * Next renders not-found without route params, so this page cannot know which
+ * language the visitor was reading. Rather than guess, it speaks both, each
+ * marked with its own lang and direction, and offers the routes most likely to
+ * rescue a visit that arrived from an old link: the equipment list and contact.
  */
 export default function LocaleNotFound() {
   return (
-    <Container className="py-16 text-center sm:py-24">
-      <p className="text-sm font-semibold uppercase tracking-wide text-amber-700 numeric-latin">
-        404
-      </p>
-      <h1 className="mt-2 text-2xl font-bold tracking-tight text-steel-950 sm:text-3xl">
-        {en.errors.notFound}
-      </h1>
-      <p className="mx-auto mt-3 max-w-md text-steel-600">{en.errors.notFoundBody}</p>
-
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <Link
-          href="/en/equipment"
-          className="inline-flex min-h-[3rem] items-center rounded-[--radius-control] bg-amber-500 px-6 text-base font-semibold text-steel-950 hover:bg-amber-400"
-        >
-          {en.equipment.allEquipment}
-        </Link>
-        <Link
-          href="/en"
-          className="inline-flex min-h-[3rem] items-center rounded-[--radius-control] border border-steel-300 px-6 text-base font-semibold text-steel-800 hover:bg-steel-100"
-        >
-          {en.errors.goHome}
-        </Link>
+    <Container className="py-20 sm:py-28">
+      <div className="grid gap-12 md:grid-cols-2">
+        <section lang="en" dir="ltr" className="font-sans">
+          <h1 className="text-h1">{en.notFound.title}</h1>
+          <p className="mt-3 text-lg text-steel-700">{en.notFound.body}</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <ButtonLink href="/en/equipment">{en.cta.viewAllEquipment}</ButtonLink>
+            <ButtonLink variant="outline" href="/en/contact">
+              {en.nav.contact}
+            </ButtonLink>
+          </div>
+          <p className="mt-5">
+            <Link href="/en" className="font-semibold underline underline-offset-4">
+              {en.notFound.home}
+            </Link>
+          </p>
+        </section>
+        <section lang="ar" dir="rtl" className="font-arabic">
+          <h2 className="text-h1">{ar.notFound.title}</h2>
+          <p className="mt-3 text-lg text-steel-700">{ar.notFound.body}</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <ButtonLink href="/ar/equipment">{ar.cta.viewAllEquipment}</ButtonLink>
+            <ButtonLink variant="outline" href="/ar/contact">
+              {ar.nav.contact}
+            </ButtonLink>
+          </div>
+          <p className="mt-5">
+            <Link href="/ar" className="font-semibold underline underline-offset-4">
+              {ar.notFound.home}
+            </Link>
+          </p>
+        </section>
       </div>
-
-      <p className="mt-6 text-sm text-steel-500">
-        <Link href="/ar" className="underline underline-offset-2">
-          العربية
-        </Link>
-      </p>
     </Container>
   );
 }

@@ -1,38 +1,61 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { Locale } from "@/lib/i18n/config";
+import { cn } from "@/components/ui";
 
 /**
- * Language switch.
+ * Switch to the same page in the other language.
  *
- * A client component ONLY so it can persist the choice in a cookie. The proxy
- * reads that cookie on the next visit, so a returning Arabic-speaking user is
- * never re-guessed from their browser headers.
+ * Most pages share a path across languages; guides do not, because their slugs
+ * are translated. `guideSlugs` maps each guide's English slug to its Arabic one
+ * so the switch lands on the translated article instead of a 404.
  *
- * It is still a real <a>: it works with JavaScript disabled, and it is
- * crawlable, which matters because these links are how Google discovers the
- * Arabic side of the site.
+ * The choice is remembered in a cookie that the proxy reads on the bare "/"
+ * visit, so a returning visitor is not re-guessed from their browser language.
+ *
+ * No aria-label: the link's name is its visible text ("English", "العربية"),
+ * marked with its own lang. Overriding it with a longer label in the page's
+ * language would break WCAG 2.5.3 — a voice-control user saying "click
+ * English" must be able to activate the link that says English.
  */
 export function LocaleSwitch({
-  href,
+  locale,
   label,
-  targetLocale,
+  guideSlugs,
+  className,
 }: {
-  href: string;
+  locale: Locale;
   label: string;
-  targetLocale: Locale;
+  guideSlugs: { en: string; ar: string }[];
+  className?: string;
 }) {
+  const pathname = usePathname();
+  const target: Locale = locale === "en" ? "ar" : "en";
+
+  const segments = pathname.split("/").filter(Boolean);
+  segments[0] = target;
+  if (segments[1] === "guides" && segments[2]) {
+    const current = decodeURIComponent(segments[2]);
+    const match = guideSlugs.find((slug) => slug[locale] === current);
+    if (match) segments[2] = match[target];
+  }
+  const destination = `/${segments.map(encodeURIComponent).join("/")}`;
+
   return (
     <Link
-      href={href}
-      hrefLang={targetLocale}
-      lang={targetLocale}
+      href={destination}
+      hrefLang={target}
+      lang={target}
       onClick={() => {
-        // 1 year, Lax, not HttpOnly — it is a UI preference, not a credential.
-        document.cookie = `hdr_locale=${targetLocale}; path=/; max-age=31536000; samesite=lax`;
+        document.cookie = `hdr_locale=${target}; path=/; max-age=31536000; samesite=lax`;
       }}
-      className="rounded-[--radius-control] border border-steel-300 px-2.5 py-2 text-sm font-medium text-steel-800 transition-colors hover:bg-steel-100"
+      className={cn(
+        "inline-flex min-h-11 items-center rounded-control px-3 text-[0.95rem] font-semibold",
+        target === "ar" ? "font-arabic" : "font-sans",
+        className,
+      )}
     >
       {label}
     </Link>

@@ -1,185 +1,151 @@
 import type { Metadata } from "next";
-import { cspNonce } from "@/lib/seo/nonce";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CompareTray } from "@/components/equipment/compare-tray";
-import { EquipmentCard } from "@/components/equipment/equipment-card";
-import { Alert, Container, EmptyState, SectionHeading } from "@/components/ui";
-import { getCategoryBySlug, listCategories, searchClasses } from "@/lib/catalog/repository";
-import { getDictionary } from "@/lib/i18n";
-import { formatNumber, isLocale, localePath, type Locale } from "@/lib/i18n/config";
-import { breadcrumbJsonLd } from "@/lib/seo/json-ld";
+import { MachineCard } from "@/components/equipment/machine-card";
+import { ContactBand, FaqList, PageHeader } from "@/components/marketing/sections";
+import { JsonLd } from "@/components/seo/json-ld";
+import { ActionLink, Container, SectionHeading, WhatsAppIcon } from "@/components/ui";
+import { FAQS } from "@/content/faqs";
+import { GUIDES } from "@/content/guides";
+import { activeCategories, categoryPath, getCategory, machineCount, machinePath, machinesIn } from "@/lib/catalog";
+import { whatsappHref } from "@/lib/contact";
+import { getDictionary, t } from "@/lib/i18n";
+import { LOCALES, isLocale, type Locale } from "@/lib/i18n/config";
+import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo/json-ld";
+import { alternates, href } from "@/lib/site";
 
-/**
- * Equipment CATEGORY landing page.
- *
- * A real, indexable page per category — "mobile cranes", "forklifts" — which is
- * where the head search volume sits. Distinct from the filtered listing, which
- * is deliberately noindexed: this page has its own copy, its own metadata and
- * its own canonical, so it is a destination rather than a query permutation.
- */
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ locale: string; category: string }>;
-}): Promise<Metadata> {
-  const { locale, category } = await params;
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return LOCALES.flatMap((locale) => activeCategories().map((category) => ({ locale, category: category.slug })));
+}
+
+type Params = Promise<{ locale: string; category: string }>;
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { locale, category: slug } = await params;
   if (!isLocale(locale)) return {};
-
-  const found = await getCategoryBySlug(category, locale);
-  if (!found) return {};
-
-  const title = found.meta_title ?? `${found.name} for Rent in Saudi Arabia`;
-  const description = found.meta_description ?? found.description ?? title;
-
+  const category = getCategory(slug);
+  if (!category) return {};
+  const dict = getDictionary(locale);
+  const name = category.name[locale];
+  const title = t(dict.meta.categoryTitle, { category: name });
+  const description = t(dict.meta.categoryDescription, { category: name, summary: category.summary[locale] });
   return {
     title,
     description,
-    alternates: {
-      canonical: `/${locale}/equipment/${category}`,
-      languages: {
-        en: `/en/equipment/${category}`,
-        ar: `/ar/equipment/${category}`,
-        "x-default": `/en/equipment/${category}`,
-      },
-    },
-    openGraph: { title, description, type: "website" },
+    alternates: alternates(locale, categoryPath(category)),
+    openGraph: { title, description },
   };
 }
 
-/**
- * No `generateStaticParams` here, deliberately.
- *
- * There was one, returning an empty array, with a comment saying it helped
- * crawlers find every category. It did not: discovery comes from the sitemap
- * and from internal links, and this function has no bearing on either. What it
- * did do was opt the route into static rendering — and since the root layout
- * reads `cookies()` to resolve the header's signed-in state, every category
- * page then threw DYNAMIC_SERVER_USAGE on a cold request in production. The
- * rejection was unhandled, so the Node process exited 128 and took any other
- * in-flight request on that instance with it.
- *
- * It survived local development because `next dev` renders everything
- * dynamically, so the fault only ever appeared on a real deployment. All
- * fourteen category pages were down.
- *
- * This route is inherently dynamic: it depends on the request's session. Say
- * nothing and let Next treat it that way.
- */
-
-export default async function CategoryPage({
-  params,
-}: {
-  params: Promise<{ locale: string; category: string }>;
-}) {
-  const { locale: rawLocale, category } = await params;
-  if (!isLocale(rawLocale)) notFound();
-  const locale: Locale = rawLocale;
+export default async function CategoryPage({ params }: { params: Params }) {
+  const { locale: raw, category: slug } = await params;
+  if (!isLocale(raw)) notFound();
+  const locale: Locale = raw;
+  const category = getCategory(slug);
+  if (!category) notFound();
   const dict = getDictionary(locale);
-
-  const found = await getCategoryBySlug(category, locale);
-  if (!found) notFound();
-
-  const [results, allCategories] = await Promise.all([
-    searchClasses({ locale, categorySlug: category, perPage: 48, sort: "capacity" }),
-    listCategories(locale),
-  ]);
+  const machines = machinesIn(category.slug);
+  const name = category.name[locale];
+  const crumbs = [
+    { name: dict.common.home, path: "/" },
+    { name: dict.nav.equipment, path: "/equipment" },
+    { name, path: categoryPath(category) },
+  ];
+  const guides = GUIDES.filter((guide) => guide.categories.includes(category.slug));
+  const others = activeCategories().filter((c) => c.slug !== category.slug);
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        // CSP applies to every <script>, including a ld+json data block that
-        // never executes. Without the nonce the block is refused and a crawler
-        // rendering under CSP never sees the structured data — silently, since
-        // the markup is still present in the HTML source.
-        nonce={await cspNonce()}
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
-            breadcrumbJsonLd([
-              { name: dict.nav.home, path: `/${locale}` },
-              { name: dict.equipment.title, path: `/${locale}/equipment` },
-              { name: found.name, path: `/${locale}/equipment/${category}` },
-            ]),
-          ),
-        }}
-      />
-
-      <Container className="py-6 sm:py-10">
-        <nav aria-label={dict.a11y.breadcrumb} className="mb-4 text-sm">
-          <ol className="flex flex-wrap items-center gap-1.5 text-steel-500">
-            <li>
-              <Link href={localePath(locale, "/")} className="hover:underline">
-                {dict.nav.home}
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href={localePath(locale, "/equipment")} className="hover:underline">
-                {dict.equipment.title}
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li className="font-medium text-steel-800" aria-current="page">
-              {found.name}
-            </li>
-          </ol>
-        </nav>
-
-        <SectionHeading level={1} title={found.name} description={found.description ?? undefined} />
-
-        <p className="mb-6 text-sm text-steel-600">
-          <span className="font-semibold text-steel-900 numeric-latin">
-            {formatNumber(results.total, locale)}
-          </span>{" "}
-          {locale === "ar" ? "طراز متاح للإيجار" : "models available to rent"} ·{" "}
-          <Link
-            href={`${localePath(locale, "/equipment")}?category=${category}`}
-            className="underline underline-offset-2"
-          >
-            {dict.equipment.checkAvailability}
-          </Link>
+      <PageHeader
+        locale={locale}
+        dict={dict}
+        crumbs={crumbs}
+        title={t(dict.equipment.categoryHeading, { category: name })}
+        intro={category.intro[locale]}
+      >
+        <p className="mt-3 text-steel-700">
+          <span className="font-semibold text-steel-900">{dict.equipment.alsoKnownAs}:</span>{" "}
+          {category.alsoKnownAs[locale].join(locale === "ar" ? "، " : ", ")}
         </p>
+        <div className="mt-6">
+          <ActionLink variant="whatsapp" href={whatsappHref(t(dict.messages.category, { category: name }))} newTab>
+            <WhatsAppIcon />
+            {dict.cta.chatOnWhatsapp}
+          </ActionLink>
+        </div>
+      </PageHeader>
 
-        {results.items.length === 0 ? (
-          <EmptyState title={dict.filters.noMatch} />
-        ) : (
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {results.items.map((item) => (
-              <li key={item.id} className="relative">
-                <EquipmentCard item={item} locale={locale} dict={dict} />
+      <Container className="py-14 sm:py-16">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 className="text-h2">{dict.equipment.inThisCategory}</h2>
+          <p className="text-steel-600">{machineCount(machines.length, locale)}</p>
+        </div>
+        <ul className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {machines.map((machine) => (
+            <li key={machine.slug} className="flex">
+              <MachineCard machine={machine} locale={locale} dict={dict} className="w-full" />
+            </li>
+          ))}
+        </ul>
+
+        {guides.length > 0 && (
+          <div className="mt-14 rounded-card border border-steel-200 bg-steel-50 p-6">
+            <h2 className="text-[1.5rem]">{dict.equipment.relatedGuide}</h2>
+            <ul className="mt-3 space-y-2">
+              {guides.map((guide) => (
+                <li key={guide.slug.en}>
+                  <Link href={href(locale, `/guides/${guide.slug[locale]}`)} className="font-semibold text-steel-900 underline underline-offset-4">
+                    {guide.title[locale]}
+                  </Link>
+                  <p className="text-steel-600">{guide.excerpt[locale]}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Container>
+
+      <section aria-labelledby="category-faq" className="border-t border-steel-200 py-16">
+        <Container className="grid gap-10 lg:grid-cols-[1fr_2fr]">
+          <SectionHeading id="category-faq" title={dict.home.faqTitle} />
+          <FaqList faqs={FAQS.slice(1, 5)} locale={locale} />
+        </Container>
+      </section>
+
+      <nav aria-labelledby="other-categories" className="border-t border-steel-200 bg-steel-50 py-14">
+        <Container>
+          <h2 id="other-categories" className="text-[1.6rem]">
+            {dict.equipment.otherCategories}
+          </h2>
+          <ul className="mt-5 flex flex-wrap gap-2">
+            {others.map((other) => (
+              <li key={other.slug}>
+                <Link
+                  href={href(locale, categoryPath(other))}
+                  className="inline-flex min-h-11 items-center rounded-full border border-steel-300 bg-white px-4 font-semibold text-steel-800 hover:border-steel-900"
+                >
+                  {other.name[locale]}
+                </Link>
               </li>
             ))}
           </ul>
-        )}
+        </Container>
+      </nav>
 
-        <Alert tone="warning" title={dict.equipment.safetyNotice} className="mt-10">
-          {dict.equipment.safetyBody}
-        </Alert>
+      <ContactBand
+        locale={locale}
+        dict={dict}
+        whatsappMessage={t(dict.messages.category, { category: name })}
+      />
 
-        {/* Internal linking across categories: helps crawl discovery and gives
-            a buyer who picked the wrong category a route out. */}
-        <section className="mt-10">
-          <SectionHeading title={dict.home.popularCategories} level={2} />
-          <ul className="flex flex-wrap gap-2">
-            {allCategories
-              .filter((c) => c.slug !== category)
-              .map((c) => (
-                <li key={c.id}>
-                  <Link
-                    href={localePath(locale, `/equipment/${c.slug}`)}
-                    className="inline-flex rounded-full border border-steel-300 bg-white px-3 py-1.5 text-sm text-steel-700 hover:border-steel-500"
-                  >
-                    {c.name}
-                  </Link>
-                </li>
-              ))}
-          </ul>
-        </section>
-      </Container>
-
-      {/* Fixed-position tray; renders nothing until two machines are picked. */}
-      <CompareTray locale={locale} dict={dict} />
+      <JsonLd
+        data={[
+          breadcrumbJsonLd(locale, crumbs),
+          itemListJsonLd(locale, machines.map((machine) => ({ name: machine.name[locale], path: machinePath(machine) }))),
+        ]}
+      />
     </>
   );
 }

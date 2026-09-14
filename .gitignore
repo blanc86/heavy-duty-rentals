@@ -23,3 +23,6 @@ next-env.d.ts
 # secrets (database URLs, keys) and must never be committed.
 .vercel.env.*
 *.local
+
+# Downloaded image sources (scripts/prepare-images.mjs)
+.image-cache/

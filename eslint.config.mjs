@@ -7,10 +7,9 @@ export default tseslint.config(
     ignores: [
       ".next/**",
       "node_modules/**",
-      "db/migrations/**",
       "playwright-report/**",
       "test-results/**",
-      "storage/**",
+      ".image-cache/**",
       "next-env.d.ts",
     ],
   },
@@ -22,16 +21,12 @@ export default tseslint.config(
     rules: {
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
-      // `any` erases exactly the guarantees this codebase relies on around
-      // money, authorization and booking state. It is an error, not a warning.
+      // `any` would let a machine without specs, or a dictionary missing an
+      // Arabic string, compile. It is an error, not a warning.
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       "no-console": ["warn", { allow: ["warn", "error"] }],
       eqeqeq: ["error", "always", { null: "ignore" }],
-      "no-restricted-globals": [
-        "error",
-        { name: "parseFloat", message: "Money is integer halalas. Never parse money as a float." },
-      ],
     },
   },
   {

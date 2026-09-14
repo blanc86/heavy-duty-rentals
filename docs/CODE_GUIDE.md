@@ -1,336 +1,201 @@
 # How this code works
 
-An orientation for someone about to change it. The other documents describe
-what was decided and why; this one describes where things are, how a request
-moves through them, and which parts will bite you.
+An orientation for someone about to change it: where things are, how to make the
+common changes, and the parts that will bite you.
 
-- `PRD.md` — what the product is meant to do
-- `ARCHITECTURE.md` — how it is deployed and why
-- `DATABASE.md` — the schema and its constraints
-- `SECURITY.md` — the threat model and controls
-- `research.md` — the Saudi market and regulatory findings behind the decisions
-- `FINAL_REVIEW.md` — what is real, what is not, and every bug found in review
+- [REDESIGN.md](REDESIGN.md) — why the site looks and works the way it does, and
+  what the business still has to supply
+- [DEPLOYMENT.md](DEPLOYMENT.md) — environment, deploying and verifying
+- [research.md](research.md) — the original market research (the booking
+  platform it argued for has since been replaced)
 
 ---
 
 ## 1. The one-paragraph version
 
-A customer searches equipment, picks dates, sees a real price and real
-availability, and books and pays online — **without creating an account**. A
-depot operator then runs the rental from an admin console: machine out, machine
-back, cancellations, taking a broken crane off the market. Everything is
-bilingual English/Arabic with full RTL.
-
-The two things the whole system is built around are that **a machine can never
-be double-booked** and that **a price shown is a price honoured**. Both are
-enforced in the database, not in application code, because application code is
-where races and refactors live.
+A bilingual (English/Arabic) marketing site for an equipment-rental business. It
+shows the fleet, answers the buyer's questions, and gets them to call, message on
+WhatsApp or send a quote request. There is no database, no API, no login and no
+form backend: every page is generated at build time from TypeScript content
+files, and every "send" hands a prefilled message to the visitor's own phone,
+WhatsApp or email app.
 
 ---
 
-## 2. Request lifecycle
-
-Every request passes through the same path:
+## 2. Where things are
 
 ```
-Browser
-  │
-  ├─▶ proxy.ts ─────────── locale negotiation (/en, /ar) + CSP with a fresh nonce
-  │                        sets x-nonce, x-pathname, x-search on the request
-  │
-  ├─▶ app/[locale]/…  ──── Server Components. Data is fetched HERE, not in the
-  │      page.tsx          browser, so pages are crawlable and ship no query JS
-  │
-  ├─▶ lib/**/repository ── reads. Every one takes the ACTOR and applies
-  │                        ownership in the same query that fetches the row
-  │
-  └─▶ lib/**/actions ───── writes. Every one goes through `guard`
+src/
+  content/              THE CONTENT. Most changes happen here.
+    business.ts           phone, WhatsApp, email, address, CR/VAT, service areas
+    catalog.ts            categories and machines, with specs
+    specs.ts              spec labels, units and formatting
+    faqs.ts  guides.ts  legal.ts
+    images.json           every photo: source, author, licence, crop, alt text
+    images.generated.ts   GENERATED from images.json — do not edit
+  lib/
+    i18n/dictionaries/    en.ts and ar.ts: every string in the interface
+    catalog.ts            lookups and paths over the catalogue
+    contact.ts            tel:, wa.me and mailto: links
+    site.ts               SITE_URL, localized hrefs, canonical + hreflang
+    seo/json-ld.ts        structured data builders
+  app/
+    [locale]/             every page, once per language
+    sitemap.ts robots.ts
+  components/
+    layout/               header, footer, mobile menu, mobile contact bar
+    equipment/            machine card, rating plate, spec table, fleet strip
+    marketing/sections.tsx  how it works, why us, FAQ list, contact band…
+    contact/enquiry-form.tsx  the quote form
+    ui/index.tsx          buttons, container, icons
+  proxy.ts                redirects bare "/" to /en or /ar
+scripts/                  image build, content check, route and a11y audits
+tests/                    content integrity, contact links, SEO
 ```
-
-`proxy.ts` is Next 16's renamed `middleware`. It runs on the Node runtime and
-does exactly two jobs — locale and CSP — because anything else in a proxy runs on
-every asset request.
-
-### Writes always go through `guard`
-
-`src/lib/server/guard.ts` is the trust boundary. Every Server Action wraps its
-handler in it, and the order is deliberate:
-
-```
-1. CSRF          same-origin check (skipped only for provider webhooks,
-                 which authenticate by signature instead)
-2. Rate limit    BEFORE authentication, so flooding the login endpoint is
-                 cheap for us and expensive for the attacker
-3. Authenticate  resolve the actor from the session cookie
-4. Authorize     requireAdmin / requireCompanyPermission / requireMfa
-5. Validate      Zod, always `.strict()` so unknown keys are rejected
-                 rather than ignored — that is what blocks mass assignment
-6. Handle        your code
-7. Audit         hash-chained, append-only
-```
-
-If you are adding a mutation and you find yourself not using `guard`, stop.
-
-> **`"use server"` makes every export a public HTTP endpoint.** Not just the ones
-> you import somewhere. A helper exported from an actions file is callable by
-> anyone who can find its id. One such helper — an unguarded booking lookup —
-> shipped in this codebase and was found by `npm run verify:reachable`.
 
 ---
 
-## 3. Where the invariants actually live
+## 3. Common changes
 
-### No double booking
+### Put in the real contact details
 
-Not a transaction, not a lock, not a check-then-insert. A Postgres exclusion
-constraint:
+Edit `BUSINESS` in `src/content/business.ts`, then remove each filled field from
+`PLACEHOLDER_FIELDS` in the same file. `npm run content:check` lists what is
+left.
 
-```sql
-ALTER TABLE reservation
-  ADD CONSTRAINT reservation_no_overlap
-  EXCLUDE USING gist (unit_id WITH =, period WITH &&)
-  WHERE (status IN ('held', 'confirmed', 'active'));
-```
+Phone and WhatsApp each have a `display` form (what people read) and `digits`
+(international format, no `+`, used in `tel:` and `wa.me` links). Set both.
 
-Two concurrent bookings for the same machine: one commits, the other gets
-SQLSTATE `23P01` and the caller offers alternatives. The integration test fires
-ten simultaneous inserts and asserts exactly one survives.
+Some details switch features on: an `address` turns the structured data into a
+`LocalBusiness`; `mapsUrl` adds "Get directions" to the contact page; `hours`,
+`crNumber`, `vatNumber` and `foundedYear` each appear once set. Placeholder
+values are never written into structured data.
 
-Because the guarantee is a constraint, it holds against code paths that do not
-exist yet.
+### Add or remove a machine
 
-### Money is never a float
+1. Add an entry to `MACHINES` in `src/content/catalog.ts`, with its category,
+   bilingual name and description, specs, and what the hire includes.
+2. Add an `equipment/<slug>` entry to `src/content/images.json` with the photo's
+   source, author, licence and alt text in both languages.
+3. `npm run images:prepare`, then `npm test`.
 
-`bigint` halalas everywhere (1 SAR = 100 halalas), VAT as parts-per-million
-(15% = `150000`), and rounding applied **once** on the taxable subtotal rather
-than per line — rounding each of a dozen lines produces an invoice that does not
-foot against its own total.
+The machine page, card, category listing, fleet strip, sitemap entry, quote-form
+option and structured data all follow from the catalogue. A test fails if a
+machine has no photo.
 
-`src/lib/pricing/engine.ts` is pure: no I/O, no clock, no database. It takes
-numbers and returns numbers, which is why it can be exhaustively tested.
-`src/lib/pricing/repository.ts` does the I/O and no arithmetic. Keep that split.
+Removing a machine that was ever live: also add a redirect from its old URL in
+`legacyRedirects()` in `next.config.ts`, so indexed links do not 404.
 
-`chargedNowHalalas` is what the card is billed (subtotal + VAT).
-`totalHalalas` includes the refundable deposit and is **never** labelled "due
-now" — the deposit is authorised at handover, not collected online.
+### Change a photo
 
-### A price shown is a price honoured
+Edit its entry in `images.json` and run `npm run images:prepare`. The script
+downloads the source (cached in `.image-cache/`), crops it to the standard frame,
+blurs any `redact` regions, writes a content-hashed file, removes the old one and
+regenerates `images.generated.ts` and the social sharing image.
 
-The browser sends what it *believes* the total is. `createBooking` recomputes
-from database rates, compares, and refuses on mismatch — writing an audit entry,
-because a systematic attempt should be visible rather than merely blocked. The
-client's figure is never written to the booking.
+- `position`: `"attention"` lets sharp find the subject; or a keyword such as
+  `"center"`.
+- `extract`: a region of the source as fractions (0–1), when the automatic crop
+  frames sky instead of the machine.
+- `redact`: rectangles, in pixels of the finished frame, to blur — for another
+  company's phone number or web address painted on a machine.
 
-### The audit log cannot be rewritten
+Only use photos whose licence allows commercial use, and record the author and
+licence: `/image-credits` is generated from the manifest and the tests check it.
 
-Hash-chained (`entryHash = SHA256(previousHash || canonicalJson(entry))`) so
-tampering is *detectable*, and the application's database role has no
-`UPDATE`/`DELETE` on it so tampering is *impossible through the app*. Both,
-deliberately: detection alone is weaker than prevention, prevention alone leaves
-no evidence if bypassed.
+### Change wording
 
----
+Interface strings are in `src/lib/i18n/dictionaries/en.ts` and `ar.ts`. The
+English file is the type: a key missing from the Arabic file is a compile error,
+not an English string on an Arabic page. Content (machines, FAQs, guides) carries
+both languages side by side in `src/content`.
 
-## 4. Module map
+Claims must be ones the business can stand behind. `tests/content.test.ts` fails
+if the interface copy uses phrases that tend to creep in unsupported ("best
+price", "guarantee", "within 24 hours" and similar). If a claim becomes true,
+change the test deliberately.
 
-| Path | What lives there |
-|---|---|
-| `lib/db` | connection, schema, and the driver-quirk helpers (§6) |
-| `lib/server/guard.ts` | the trust boundary every mutation passes through |
-| `lib/server/audit.ts` | hash-chained append-only log |
-| `lib/server/rate-limit.ts` | named buckets; see §6 on the two login limits |
-| `lib/auth` | sessions, passwords, MFA, the post-login redirect rule |
-| `lib/rbac.ts` | permissions. `admin:*` for staff, `booking:*` etc. for company members — they are **different sets** |
-| `lib/availability` | who is free when; the expiry-aware read predicate |
-| `lib/pricing` | pure engine + impure repository |
-| `lib/booking` | `createBooking`, `transitionBooking`, customer actions |
-| `lib/payments` | provider interface, mock + Moyasar adapters, webhook processing, refunds |
-| `lib/invoicing` | VAT invoices; ZATCA is a boundary that refuses to pretend |
-| `lib/catalog` | equipment search, filters, class detail |
-| `lib/admin` | operator reads and the operational actions |
-| `lib/i18n` | `en.ts` is the **type source**; a missing Arabic key is a compile error |
-| `components/ui` | the primitives everything else is built from |
+### Add a service city
+
+Add it to `SERVICE_AREAS` in `src/content/business.ts`, with a `planning` note
+in both languages that is genuinely specific to working there. A test rejects a
+note that is another city's note with only the name changed.
 
 ---
 
-## 4a. Who can sign in, and who cannot
+## 4. Rendering
 
-**Customers have no accounts.** There is no registration page and no
-`registerAction`; `/register` returns 404 and the pen test asserts that it
-does. Requiring a signup before a contractor can hire a machine cost bookings
-and was never doing work the business needed — identity is checked at handover,
-and the money is checked by the card.
+Every page is static. `[locale]` pages export `generateStaticParams` and
+`dynamicParams = false`, so an unknown slug is a 404 at the edge rather than a
+server render. Keep it that way:
 
-A guest checkout still writes a `user` row, found or created by email
-(`lib/booking/guest.ts`). That is what keeps `booking.customer_user_id` NOT
-NULL, keeps every scoped read unchanged, and makes repeat business visible in
-the admin console. The row carries `is_guest = TRUE` and a `password_hash` that
-is not PHC format, so Argon2 verification cannot match it: the row exists but
-cannot authenticate.
-
-**Customers come back with a reference and an email.** `/[locale]/booking` is
-the lookup form. A match mints a session with `session.scoped_booking_id` set,
-and three things follow from that column:
-
-| Where | Effect |
-|---|---|
-| `scopeFor` in `booking/repository.ts` | narrows every booking read to that one id, checked first and returned immediately so no later branch can widen it |
-| `guard()` | refuses the session entirely unless the action passes `allowScopedSession` — only cancellation does |
-| `getFullActor()` | returns null for it, so pages that mean "signed in properly" (account, admin) reject it without each remembering to |
-
-The session lives four hours, not thirty days. It exists to look at one rental,
-often on a shared site-office machine.
-
-**Two traps this design has, both closed:**
-
-Anyone can type any email at checkout. If that address already has a real
-account, the booking attaches to *that* user id. So `resolveGuestBooking`
-requires `is_guest = TRUE` — otherwise a stranger could book using a staff
-address and then "look up" their own reference to receive a session carrying
-that staff member's identity. For the same reason the checkout mints a session
-only when `customer.isGuest`, never merely when nobody is signed in.
-
-The lookup returns one message for every failure — no such reference, wrong
-email, and "that address has an account, so sign in instead" are
-indistinguishable. The sign-in sentence appears in all three cases, so it
-guides an account holder out of a dead end without telling anyone else which
-case they hit.
-
-**`/login` is for staff and business accounts**, linked from the footer, not the
-header. The header's anonymous slot says "My booking" and points at the lookup.
-
-There is no admin screen that creates an account either, and that is deliberate
-rather than missing: onboarding an account holder securely needs a way to
-deliver a set-your-password link to a proven address, and this deployment has no
-email transport. An admin typing a password and relaying it out of band hands a
-real credential around in plaintext, so it is not offered.
+- **Do not read `searchParams`, `cookies()` or `headers()` in a page.** Any of
+  them opts the page out of static generation. The quote form reads
+  `?equipment=` in a client effect after hydration for exactly this reason.
+- **Do not add a CSP nonce.** Nonces force per-request rendering. The CSP in
+  `next.config.ts` allows inline scripts instead.
+- `proxy.ts` (Next 16's name for middleware) matches only `/`. Widening its
+  matcher runs it on every page and asset request.
 
 ---
 
-## 5. The booking lifecycle
+## 5. Things that will bite you
 
-```
-                 checkout           verified webhook        depot          depot
- (none) ──────▶ pending_payment ──────▶ confirmed ──────▶ active ──────▶ completed
-                    │                       │                │
-                    │ hold lapses           │ customer or    │
-                    ▼ (sweeper)             ▼ operator       ▼
-                 expired               cancelled ◀───────────┘
-```
+**Arabic slugs arrive percent-encoded.** Guide slugs are translated, and Next.js
+passes dynamic segments to the page still encoded. Decode with
+`decodeSlugParam` from `src/lib/routing.ts` before looking up content. The
+language switch maps each guide's English slug to its Arabic one; a new guide
+needs both.
 
-Two things worth knowing:
+**Tailwind v4 syntax.** Design tokens live in `@theme` in `globals.css` and
+become utilities directly: `rounded-control`, `bg-machine-500`, `text-h1`.
+The v3 form `rounded-[--radius-control]` silently does nothing.
 
-**The reservation is written as a `held` row with an expiry**, before payment.
-Payment hardens it to `confirmed` with a null expiry. If the customer abandons
-the payment page, the hold lapses and the machine returns to the fleet. Writing
-it as `confirmed` immediately — which it once did — removes the machine
-permanently on every abandoned checkout.
+**Conflicting utilities do not merge.** `cn()` only joins class names. Passing
+`inline-flex` to a component that already has `hidden` leaves both, and whichever
+comes later in the stylesheet wins — which is why the header's quote button hides
+on a wrapper `div` rather than on the button.
 
-**Only a verified webhook can confirm a booking.** A browser POSTing "I paid"
-changes nothing, because the confirmation path starts from a signature the
-browser cannot produce.
+**Arabic heading fonts are unlayered CSS.** `:lang(ar) .font-display` sits
+outside `@layer` so it beats the `font-display` utility. Moving it into a layer
+brings back Latin letterforms on Arabic headings.
 
----
+**Numbers inside Arabic text.** Wrap phone numbers, measurements and years in
+`.ltr-nums`, or bidi reordering turns `+966 5…` into `966 5…+`.
 
-## 6. Things that will bite you
+**Image loading.** In Next 16 `priority` is deprecated. Use `preload` on the one
+image that is the page's Largest Contentful Paint (`SiteImage preload`) and
+`eager` for other images visible on arrival. Everything else lazy-loads.
 
-These are all real defects that shipped and were found in review. They are
-listed because each one looked correct.
+**Never hand-replace a file in `public/images`.** Images are cached for a year as
+immutable; a changed photo needs a new file name, which the image script gives it.
 
-**Raw `db.execute` returns strings, not Dates.** Drizzle's postgres-js driver
-runs raw SQL through `unsafe()`, which bypasses the type parsers. A
-`timestamptz` arrives as `"2026-09-08 00:00:00+00"` — not valid ISO 8601. The
-generic on `db.execute<T>` is an *unchecked assertion*, so declaring
-`start_date: Date` compiles and then throws inside `Intl.DateTimeFormat`. Declare
-these columns as `string` and convert with `parseTimestamp` from `lib/db`.
+**The mobile contact bar reserves its own space.** `<body>` has bottom padding
+below the `md` breakpoint so the fixed bar never covers the footer. A new fixed
+element at the bottom needs the same.
 
-**Interpolating a JS array into raw SQL does not make a Postgres array.**
-Drizzle expands it into one bind parameter per element, so
-`ANY(${ids}::uuid[])` receives a bare uuid and fails with `22P02`. Use
-`inArray()` from the query builder.
-
-**Dynamic route params arrive percent-encoded.** Invisible for ASCII slugs,
-fatal for the Arabic article slugs. Use `decodeSlugParam` from `lib/routing`.
-
-**A grid item defaults to `min-width: auto`.** The widest child sets a floor for
-the column, so an overflow container inside it never gets to scroll and the
-whole page slides sideways on a phone. `min-w-0` on the column.
-
-**CSP applies to every `<script>`, including `application/ld+json`.** Structured
-data without the nonce is refused, and a crawler rendering with CSP sees none of
-it — silently, because the markup is still in the source. Use `cspNonce()` from
-`lib/seo/nonce`.
-
-**Login needs two rate limits, not one.** Buckets are keyed
-`name:identifier`, so limiting by email gives every account its own allowance and
-does nothing against spraying one password across a thousand accounts. `login`
-(per email) and `loginPerIp` (per caller) are both applied and neither
-substitutes for the other.
-
-**A config switch that is not read is not a setting.** `TAX_INVOICE_PROVIDER`,
-`RATE_LIMIT_BACKEND` and three others once selected unimplemented backends and
-silently did nothing. Every unimplemented option now refuses to start. If you
-add a provider seam, make selecting the missing half fail loudly.
+**The fleet strip is duplicated for the loop.** The second copy is `aria-hidden`
+and `inert` so screen readers and keyboard users meet each machine once. Under
+`prefers-reduced-motion` it stops, hides the copy and becomes a scrollable row.
 
 ---
 
-## 7. Running it
+## 6. Checks
 
 ```bash
-npm install
-cp .env.example .env          # fill ENCRYPTION_KEY and APP_SECRET
-npm run db:up                 # Postgres 17 in Docker
-npm run db:migrate            # forward-only SQL, one transaction per file
-npm run db:grant              # least-privilege hdr_app role — run after EVERY migrate
-npm run db:seed               # demo fleet, admin + customer accounts
-node scripts/fetch-demo-images.mjs   # optional: freely-licensed demo photography
-npm run dev
+npm run verify
 ```
 
-Sign in with `admin@example.com` (staff console) and the seed password
-from `.env`. All equipment is fictional demo data and is flagged as such in the
-UI.
+Typecheck, lint and unit tests. Then, against a running build (`npm run build`
+then `npm run start`):
 
-### Verification
+```bash
+APP_URL=http://localhost:3000 npm run verify:routes
+```
 
-| Command | What it proves |
-|---|---|
-| `npm run verify` | types, lint, 164 unit and integration tests |
-| `npm run verify:routes` | every route in both locales, and every internal link |
-| `npm run pentest` | 51 adversarial probes: IDOR, escalation, injection, traversal, XSS, redirects, headers |
-| `npm run verify:a11y` | WCAG 2.2 A/AA in a real browser, both locales |
-| `npm run verify:reachable` | exported capabilities nothing can reach |
-| `node scripts/verify-flow.mjs` | the money path end to end against a running server |
-| `node scripts/verify-mfa.mjs` | the second-factor gate |
+```bash
+APP_URL=http://localhost:3000 npm run verify:a11y
+```
 
-The last three need `npm run dev` running. CI runs all of them
-(`.github/workflows/verify.yml`).
-
-`REQUIRE_DB=1` turns "database unreachable" from a skip into a failure. Tests
-skip by default so `npm test` is useful on a laptop without Docker; CI sets it,
-because a broken database silently skipping 48 tests is worse than a red build.
-
-### Why CI runs the dev server
-
-`next start` forces `NODE_ENV=production`, and `assertProductionReady` then
-refuses to boot with `PAYMENT_PROVIDER=mock` and a database URL without
-`sslmode=require`. That guard is correct — it exists to stop a deployment that
-takes no real money — so CI runs the dev server rather than weakening it.
-
----
-
-## 8. What is deliberately not built
-
-Named here so nobody goes looking for it. The full list with reasoning is
-`FINAL_REVIEW.md` §3.
-
-- **Notifications.** No mail or SMS transport exists. Nobody receives anything.
-- **ZATCA Phase 2 clearance.** Invoices are structurally correct and visibly
-  labelled "not cleared". Selecting `zatca` refuses to start.
-- **The deposit hold.** A hosted-page PSP redirects once per checkout, and
-  authorising afterwards needs a stored card token that needs a signed contract.
-  The deposit is presented as authorised at handover and is never charged online.
-- **Password reset**, which needs the mail transport.
-- **S3 storage, Redis rate limiting** — both refuse to start if selected.
-
-The pattern to preserve: a gap is fine, a gap wearing a working switch is not.
+`npm run verify:reachable` lists exports nothing imports — informational, for
+spotting dead code.

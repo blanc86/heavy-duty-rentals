@@ -1,0 +1,340 @@
+[
+  {
+    "key": "hero/excavator-golden-hour",
+    "kind": "hero",
+    "download": "https://unsplash.com/photos/3xaxYYv1_PI/download?force=true&w=2800",
+    "author": "Built Robotics",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/3xaxYYv1_PI",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "center",
+    "alt": {
+      "en": "Tracked excavator working on an earthworks site in low evening sun",
+      "ar": "حفار مجنزر يعمل في موقع أعمال ترابية تحت شمس المساء"
+    }
+  },
+  {
+    "key": "banner/riyadh-skyline",
+    "kind": "banner",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/9/98/Riyadh_Skyline_showing_the_King_Abdullah_Financial_District_%28KAFD%29_and_the_famous_Kingdom_Tower_.jpg",
+    "author": "B.alotaby",
+    "authorUrl": "https://commons.wikimedia.org/wiki/User:B.alotaby",
+    "source": "Wikimedia Commons",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Riyadh_Skyline_showing_the_King_Abdullah_Financial_District_(KAFD)_and_the_famous_Kingdom_Tower_.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "position": "center",
+    "alt": {
+      "en": "Riyadh skyline at sunset, with Kingdom Centre Tower and construction cranes at the King Abdullah Financial District",
+      "ar": "أفق الرياض عند الغروب، ويظهر برج المملكة والرافعات في مركز الملك عبدالله المالي"
+    }
+  },
+  {
+    "key": "banner/excavators-at-dusk",
+    "kind": "banner",
+    "download": "https://unsplash.com/photos/su28EW1eYT4/download?force=true&w=2400",
+    "author": "Matt Seymour",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/su28EW1eYT4",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "center",
+    "alt": {
+      "en": "Excavators silhouetted against the sky at dusk",
+      "ar": "حفارات تظهر ظلالها مقابل السماء عند الغروب"
+    }
+  },
+  {
+    "key": "equipment/all-terrain-crane-50t",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/kjOaSTj9xo0/download?force=true&w=2000",
+    "author": "WKH Studio",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/kjOaSTj9xo0",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Mobile crane set up on a city street between office towers",
+      "ar": "رافعة متحركة مجهزة في شارع بين الأبراج المكتبية"
+    }
+  },
+  {
+    "key": "equipment/all-terrain-crane-100t",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/6fSfmrjqulw/download?force=true&w=2000",
+    "author": "Jindřich Krumhanzl",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/6fSfmrjqulw",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "center",
+    "redact": [
+      { "left": 584, "top": 674, "width": 190, "height": 54 }
+    ],
+    "alt": {
+      "en": "Yellow all-terrain crane parked in a sunny industrial yard",
+      "ar": "رافعة جميع التضاريس صفراء متوقفة في ساحة صناعية مشمسة"
+    },
+    "extract": {
+      "left": 0.1125,
+      "top": 0.137,
+      "width": 0.675,
+      "height": 0.675
+    }
+  },
+  {
+    "key": "equipment/all-terrain-crane-200t",
+    "kind": "equipment",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/4/4d/20100225-Liebherr_LTM_1200-5.jpg",
+    "author": "K. Krallis (SV1XV)",
+    "authorUrl": "https://commons.wikimedia.org/wiki/User:Sv1xv",
+    "source": "Wikimedia Commons",
+    "sourceUrl": "https://commons.wikimedia.org/w/index.php?curid=9618644",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "position": "attention",
+    "alt": {
+      "en": "Five-axle 200 tonne all-terrain crane on its outriggers",
+      "ar": "رافعة جميع التضاريس بحمولة 200 طن وخمسة محاور على دعاماتها"
+    }
+  },
+  {
+    "key": "equipment/crawler-crane-300t",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/nQxOffcW-mg/download?force=true&w=2000",
+    "author": "Roger Starnes Sr",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/nQxOffcW-mg",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Red lattice-boom crawler crane on tracks at a construction site",
+      "ar": "رافعة زاحفة حمراء بذراع شبكي على جنازير في موقع بناء"
+    }
+  },
+  {
+    "key": "equipment/boom-truck-15t",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/O2g8HCgDN8o/download?force=true&w=2000",
+    "author": "Chris Boyd",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/O2g8HCgDN8o",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "redact": [
+      { "left": 455, "top": 460, "width": 96, "height": 96 },
+      { "left": 505, "top": 432, "width": 96, "height": 96 },
+      { "left": 552, "top": 404, "width": 96, "height": 96 },
+      { "left": 790, "top": 665, "width": 190, "height": 190 }
+    ],
+    "alt": {
+      "en": "Truck-mounted crane parked at a building site",
+      "ar": "رافعة مركبة على شاحنة متوقفة في موقع بناء"
+    }
+  },
+  {
+    "key": "equipment/forklift-3t-diesel",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/QBcxhOcDU4U/download?force=true&w=2000",
+    "author": "Bigfoot STNGR",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/QBcxhOcDU4U",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Diesel counterbalance forklift driving along a yard road",
+      "ar": "رافعة شوكية ديزل تسير على طريق داخل ساحة"
+    }
+  },
+  {
+    "key": "equipment/forklift-16t-diesel",
+    "kind": "equipment",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/8/8d/Hyster_12-6_12T_forklift_%2814924503044%29.jpg",
+    "author": "Bob Adams",
+    "authorUrl": "https://www.flickr.com/people/46185203@N05",
+    "source": "Wikimedia Commons",
+    "sourceUrl": "https://commons.wikimedia.org/w/index.php?curid=36406557",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0/",
+    "position": "attention",
+    "alt": {
+      "en": "Large diesel forklift in a timber yard",
+      "ar": "رافعة شوكية ديزل كبيرة في ساحة أخشاب"
+    }
+  },
+  {
+    "key": "equipment/telehandler-17m",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/lzW4Zv95-Ts/download?force=true&w=2000",
+    "author": "Lajos Szabo",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/lzW4Zv95-Ts",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Yellow telehandler with its boom raised in a timber yard",
+      "ar": "رافعة تلسكوبية صفراء بذراع مرفوع في ساحة أخشاب"
+    }
+  },
+  {
+    "key": "equipment/excavator-20t",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/bGMyTnSlYvE/download?force=true&w=2000",
+    "author": "EESOFUFFZICH",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/bGMyTnSlYvE",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Tracked excavator standing on sand in warm evening light",
+      "ar": "حفار مجنزر على الرمل في ضوء المساء الدافئ"
+    }
+  },
+  {
+    "key": "equipment/excavator-36t",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/nkxB5Ab-ONY/download?force=true&w=2000",
+    "author": "Billy Freeman",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/nkxB5Ab-ONY",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Large excavator working on top of an earth mound",
+      "ar": "حفار كبير يعمل فوق كومة من التراب"
+    }
+  },
+  {
+    "key": "equipment/wheel-loader-3m3",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/N1LBcqLP9ec/download?force=true&w=2000",
+    "author": "Zac Edmonds",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/N1LBcqLP9ec",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Wheel loader carrying a full bucket of red earth",
+      "ar": "لودر بعجل يحمل دلواً ممتلئاً بالتراب الأحمر"
+    }
+  },
+  {
+    "key": "equipment/backhoe-loader",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/zU0htI8Y55M/download?force=true&w=2000",
+    "author": "Roger Starnes Sr",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/zU0htI8Y55M",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Yellow backhoe loader parked beside a steel silo",
+      "ar": "حفار لودر أصفر متوقف بجانب صومعة معدنية"
+    }
+  },
+  {
+    "key": "equipment/boom-lift-26m",
+    "kind": "equipment",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/4/4a/Geniue_Z-135_lift.jpg",
+    "author": "PvOberstein",
+    "source": "Wikimedia Commons",
+    "sourceUrl": "https://commons.wikimedia.org/w/index.php?curid=69488940",
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "position": "attention",
+    "alt": {
+      "en": "Diesel articulating boom lift parked on a construction site",
+      "ar": "رافعة أفراد مفصلية تعمل بالديزل متوقفة في موقع بناء"
+    },
+    "authorUrl": "https://commons.wikimedia.org/wiki/User:PvOberstein"
+  },
+  {
+    "key": "equipment/scissor-lift-12m",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/NIq3Bjt5RIE/download?force=true&w=2000",
+    "author": "FleetNow",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/NIq3Bjt5RIE",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Row of scissor lifts parked side by side",
+      "ar": "صف من الرافعات المقصية متوقفة جنباً إلى جنب"
+    }
+  },
+  {
+    "key": "equipment/generator-500kva",
+    "kind": "equipment",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/f/f6/Caterpillar_%28Olympian%29_Generator_Set.jpg",
+    "author": "Gregsedits",
+    "source": "Wikimedia Commons",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Caterpillar_(Olympian)_Generator_Set.jpg",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "position": "attention",
+    "alt": {
+      "en": "Large canopied diesel generator set on a concrete pad",
+      "ar": "مولد ديزل كبير بهيكل مغلق على قاعدة خرسانية"
+    }
+  },
+  {
+    "key": "equipment/air-compressor-375cfm",
+    "kind": "equipment",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Atlas_Copco_XAS_66.jpg",
+    "author": "Norbert Schnitzler",
+    "authorUrl": "https://commons.wikimedia.org/wiki/User:Timo_Beil",
+    "source": "Wikimedia Commons",
+    "sourceUrl": "https://commons.wikimedia.org/w/index.php?curid=2193078",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+    "position": "attention",
+    "redact": [
+      { "left": 620, "top": 338, "width": 182, "height": 152 }
+    ],
+    "alt": {
+      "en": "Towable diesel air compressor on a construction site",
+      "ar": "ضاغط هواء ديزل قابل للسحب في موقع بناء"
+    }
+  },
+  {
+    "key": "equipment/dewatering-pump-6in",
+    "kind": "equipment",
+    "download": "https://upload.wikimedia.org/wikipedia/commons/8/86/FEMA_-_34923_-_Pumps_being_used_to_release_pressure_on_a_levee_in_Illinois.jpg",
+    "author": "Marty Bahamonde / FEMA",
+    "source": "Wikimedia Commons",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:FEMA_-_34923_-_Pumps_being_used_to_release_pressure_on_a_levee_in_Illinois.jpg",
+    "license": "Public domain",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/File:FEMA_-_34923_-_Pumps_being_used_to_release_pressure_on_a_levee_in_Illinois.jpg",
+    "position": "attention",
+    "alt": {
+      "en": "Diesel trailer pumps with discharge hoses running across a site",
+      "ar": "مضخات ديزل على مقطورات مع خراطيم تصريف ممتدة عبر الموقع"
+    }
+  },
+  {
+    "key": "equipment/low-bed-trailer-60t",
+    "kind": "equipment",
+    "download": "https://unsplash.com/photos/4wj8Rs9SJeQ/download?force=true&w=2400",
+    "author": "Troy Mortier",
+    "source": "Unsplash",
+    "sourceUrl": "https://unsplash.com/photos/4wj8Rs9SJeQ",
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "position": "attention",
+    "alt": {
+      "en": "Low-bed trailer carrying a wheel loader across a large earthworks site",
+      "ar": "مقطورة منخفضة تحمل لودراً بعجل عبر موقع أعمال ترابية كبير"
+    }
+  }
+]

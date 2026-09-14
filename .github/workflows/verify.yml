@@ -11,42 +11,10 @@ concurrency:
   group: verify-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Matches docker-compose.yml, so a failure reproduces locally with the same
-  # command. The password guards a throwaway container on a runner that is
-  # destroyed afterwards; it is not a secret and must not be treated as one.
-  DATABASE_URL: postgresql://hdr:hdr_dev_password@localhost:5433/hdr
-  APP_URL: http://localhost:3000
-  NEXT_PUBLIC_APP_URL: http://localhost:3000
-  # Integration tests SKIP when Postgres is unreachable, so that `npm test` on a
-  # laptop without Docker still gives a useful answer. In CI that behaviour is
-  # dangerous — a broken database would turn 48 tests green by skipping them —
-  # so this turns an unreachable database into a hard failure.
-  REQUIRE_DB: "1"
-
 jobs:
-  # ---------------------------------------------------------------------------
-  # Fast: everything that needs no running server. Fails in ~2 minutes when it
-  # fails, rather than behind a five-minute browser audit.
-  # ---------------------------------------------------------------------------
-  static:
-    name: Types, lint, tests, build
+  verify:
+    name: Types, lint, tests, build, routes, accessibility
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: hdr
-          POSTGRES_PASSWORD: hdr_dev_password
-          POSTGRES_DB: hdr
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U hdr"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
@@ -58,95 +26,26 @@ jobs:
 
       - run: npm ci
 
-      - name: Generate run-scoped crypto keys
-        # Generated per run rather than committed, so nothing in this repository
-        # ever looks like a real key someone might copy into an environment.
-        # MFA enrolment cannot run without ENCRYPTION_KEY, and the mock payment
-        # provider signs its webhooks with APP_SECRET.
-        run: |
-          echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")" >> "$GITHUB_ENV"
-          echo "APP_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")" >> "$GITHUB_ENV"
-
-      - name: Migrate, provision the app role, seed
-        # db:grant is part of the deploy, not a one-off: it grants on the tables
-        # that exist when it runs, and revokes UPDATE/DELETE on the append-only
-        # ones. Running it here keeps CI honest about the production shape.
-        run: |
-          npm run db:migrate
-          npm run db:grant
-          npm run db:seed
-
-      - name: Typecheck, lint, unit and integration tests
+      - name: Typecheck, lint, unit tests
         run: npm run verify
 
       - name: Production build
+        # Every page is generated here, so a content error that only shows up
+        # when a page renders (a machine with no image, a broken guide) fails
+        # the build rather than a visitor's request.
         run: npm run build
 
       - name: Unreachable-export scan
-        # Informational: it exits 0 by design. An unreferenced export is a
-        # question for a person, not a build failure — but it belongs in the log
-        # so a new one is visible in the diff of a run.
+        # Informational: exits 0 by design. An unused export is a question for
+        # a person, not a build failure, but it belongs in the log.
         run: npm run verify:reachable
-
-  # ---------------------------------------------------------------------------
-  # Slow: everything that needs a running application and a real browser.
-  # ---------------------------------------------------------------------------
-  runtime:
-    name: Flow, MFA, routes, pen test, accessibility
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: hdr
-          POSTGRES_PASSWORD: hdr_dev_password
-          POSTGRES_DB: hdr
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U hdr"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
 
       - name: Install Chromium for the accessibility audit
         run: npx playwright install --with-deps chromium
 
-      - name: Generate run-scoped crypto keys
+      - name: Start the production build
         run: |
-          echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")" >> "$GITHUB_ENV"
-          echo "APP_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")" >> "$GITHUB_ENV"
-
-      - name: Migrate, provision the app role, seed
-        run: |
-          npm run db:migrate
-          npm run db:grant
-          npm run db:seed
-
-      - name: Start the application
-        # `npm run dev`, not `next start`, and deliberately so.
-        #
-        # `next start` forces NODE_ENV=production, and `assertProductionReady`
-        # then refuses to boot with PAYMENT_PROVIDER=mock and a DATABASE_URL
-        # without sslmode=require. That guard is correct — it exists to stop a
-        # deployment that takes no real money — so CI runs the dev server rather
-        # than weakening it. The verification scripts were written against dev
-        # and account for its behaviour, including the HMR socket that never
-        # lets the network go idle.
-        run: |
-          npm run dev > "$RUNNER_TEMP/dev-server.log" 2>&1 &
-          echo $! > "$RUNNER_TEMP/dev-server.pid"
+          npm run start -- -p 3000 > "$RUNNER_TEMP/server.log" 2>&1 &
           for i in $(seq 1 60); do
             if curl -sfo /dev/null http://localhost:3000/en; then
               echo "server responding after ${i}s"
@@ -155,29 +54,19 @@ jobs:
             sleep 1
           done
           echo "server did not respond within 60s"
-          cat "$RUNNER_TEMP/dev-server.log"
+          cat "$RUNNER_TEMP/server.log"
           exit 1
 
-      - name: End-to-end flow and security checks
-        run: node scripts/verify-flow.mjs
+      - name: Every page, link, image, redirect and header
+        run: npm run verify:routes
+        env:
+          APP_URL: http://localhost:3000
 
-      - name: MFA gate
-        run: node scripts/verify-mfa.mjs
-
-      - name: Every route, both locales, and every internal link
-        run: node scripts/verify-routes.mjs
-
-      - name: Penetration test — adversarial probes
-        # Asserts the application REFUSES, where the flow check asserts it
-        # works. A feature can work perfectly and still hand a stranger someone
-        # else's invoice, so both run.
-        run: npm run pentest
-
-      - name: Accessibility — WCAG 2.2 A and AA, both locales
+      - name: Accessibility — WCAG 2.2 A and AA, both languages
         run: npm run verify:a11y
+        env:
+          APP_URL: http://localhost:3000
 
-      - name: Dev server log
-        # The scripts assert over HTTP, so a failure above is usually explained
-        # by a stack trace in the server's output rather than in the assertion.
+      - name: Server log
         if: failure()
-        run: cat "$RUNNER_TEMP/dev-server.log"
+        run: cat "$RUNNER_TEMP/server.log"

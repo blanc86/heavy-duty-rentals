@@ -1,228 +1,184 @@
-import { env } from "@/lib/env";
+import { BUSINESS, PLACEHOLDER_FIELDS, SERVICE_AREAS } from "@/content/business";
+import type { Machine } from "@/content/catalog";
+import type { Faq } from "@/content/faqs";
+import type { Guide } from "@/content/guides";
+import { IMAGES } from "@/content/images.generated";
+import { formattedSpecs } from "@/content/specs";
 import type { Locale } from "@/lib/i18n/config";
-import type { Halalas } from "@/lib/money";
-import type { BusinessSettings } from "@/lib/settings";
+import { absoluteUrl, SITE_URL } from "@/lib/site";
 
 /**
- * Structured data.
+ * Structured data (schema.org JSON-LD).
  *
- * RULE: emit only what the page ACTUALLY is, and only claims the business has
- * actually supplied. Specifically, we never emit `aggregateRating` unless real
- * published reviews exist, and we never emit certifications, awards or founding
- * dates that are placeholders. Fabricated structured data is both a Google
- * penalty risk and a lie told at machine scale.
+ * Two rules:
+ *
+ * 1. Nothing here that the page does not also say. Google treats markup that
+ *    disagrees with visible content as spam, and a buyer who reads a phone
+ *    number in a search result must find the same one on the page.
+ *
+ * 2. No placeholder ever reaches a search engine. Contact details still marked
+ *    as placeholders in content/business.ts are left OUT of the markup rather
+ *    than published into Google's index, where a wrong number outlives the fix
+ *    by weeks. The business entity is an Organization until a real address
+ *    exists, because LocalBusiness requires one.
  */
 
-const url = (path: string) => new URL(path, env.APP_URL).toString();
+const ORG_ID = `${SITE_URL}/#organization`;
+const WEBSITE_ID = `${SITE_URL}/#website`;
 
-export function organizationJsonLd(
-  locale: Locale,
-  business: BusinessSettings,
-  branches: { slug: string; name: string; city: string; address: string; phone: string | null }[],
-) {
-  const name = locale === "ar" ? business.companyNameAr : business.companyNameEn;
+const isPlaceholder = (field: (typeof PLACEHOLDER_FIELDS)[number]) => PLACEHOLDER_FIELDS.includes(field);
+
+type JsonLd = Record<string, unknown>;
+
+export function organizationJsonLd(locale: Locale): JsonLd {
+  const hasAddress = BUSINESS.address !== null && !isPlaceholder("address");
 
   return {
     "@context": "https://schema.org",
-    "@type": "Organization",
-    "@id": url("/#organization"),
-    name,
-    url: url(`/${locale}`),
-    telephone: business.phone,
-    email: business.email,
-    address: {
-      "@type": "PostalAddress",
-      addressCountry: "SA",
-      streetAddress: locale === "ar" ? business.addressAr : business.addressEn,
-    },
-    // Branches are real rows in the database with real service areas, so
-    // declaring them as departments is accurate.
-    department: branches.map((branch) => ({
-      "@type": "LocalBusiness",
-      "@id": url(`/${locale}/locations/${branch.slug}#branch`),
-      name: branch.name,
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: branch.city,
-        addressCountry: "SA",
-        streetAddress: branch.address,
-      },
-      ...(branch.phone ? { telephone: branch.phone } : {}),
+    "@type": hasAddress ? "LocalBusiness" : "Organization",
+    "@id": ORG_ID,
+    name: BUSINESS.name[locale],
+    alternateName: BUSINESS.name[locale === "en" ? "ar" : "en"],
+    ...(BUSINESS.legalName && !isPlaceholder("legalName") ? { legalName: BUSINESS.legalName } : {}),
+    url: absoluteUrl(locale),
+    logo: `${SITE_URL}/icon.svg`,
+    image: `${SITE_URL}/og/default.jpg`,
+    description:
+      locale === "ar"
+        ? "تأجير المعدات الثقيلة لمواقع البناء والمصانع في السعودية."
+        : "Heavy equipment rental for construction and industrial sites in Saudi Arabia.",
+    areaServed: SERVICE_AREAS.map((area) => ({
+      "@type": "City",
+      name: area.city[locale],
+      containedInPlace: { "@type": "Country", name: locale === "ar" ? "السعودية" : "Saudi Arabia" },
     })),
-    // `foundedYear` is null until the business sets it, and we omit the field
-    // rather than inventing a founding date.
-    ...(business.foundedYear ? { foundingDate: String(business.foundedYear) } : {}),
+    knowsLanguage: ["ar", "en"],
+    ...(!isPlaceholder("phone") ? { telephone: `+${BUSINESS.phone.digits}` } : {}),
+    ...(!isPlaceholder("email") ? { email: BUSINESS.email } : {}),
+    ...(!isPlaceholder("phone")
+      ? {
+          contactPoint: {
+            "@type": "ContactPoint",
+            telephone: `+${BUSINESS.phone.digits}`,
+            contactType: "sales",
+            availableLanguage: ["Arabic", "English"],
+            areaServed: "SA",
+          },
+        }
+      : {}),
+    ...(hasAddress && BUSINESS.address
+      ? {
+          address: {
+            "@type": "PostalAddress",
+            streetAddress: BUSINESS.address[locale],
+            addressCountry: "SA",
+          },
+        }
+      : {}),
+    ...(BUSINESS.vatNumber && !isPlaceholder("vatNumber") ? { vatID: BUSINESS.vatNumber } : {}),
+    ...(BUSINESS.foundedYear && !isPlaceholder("foundedYear") ? { foundingDate: String(BUSINESS.foundedYear) } : {}),
   };
 }
 
-export function websiteJsonLd(locale: Locale) {
+export function websiteJsonLd(locale: Locale): JsonLd {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    "@id": url("/#website"),
-    url: url(`/${locale}`),
+    "@id": WEBSITE_ID,
+    url: absoluteUrl(locale),
+    name: BUSINESS.name[locale],
     inLanguage: locale === "ar" ? "ar-SA" : "en-SA",
-    potentialAction: {
-      "@type": "SearchAction",
-      target: {
-        "@type": "EntryPoint",
-        urlTemplate: url(`/${locale}/equipment?q={search_term_string}`),
-      },
-      "query-input": "required name=search_term_string",
-    },
+    publisher: { "@id": ORG_ID },
+  };
+}
+
+export function breadcrumbJsonLd(locale: Locale, crumbs: { name: string; path: string }[]): JsonLd {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: crumb.name,
+      item: absoluteUrl(locale, crumb.path),
+    })),
   };
 }
 
 /**
- * Product/Offer for an equipment class.
- *
- * `price` is the genuine lowest daily rate from the rate card. When a class has
- * no published rate (quote-only), no Offer is emitted at all — an offer without
- * a price is exactly the kind of structured data that misleads.
+ * A machine page describes a rental SERVICE, not a product for sale — there is
+ * no price and nothing to buy online, and Product markup without an offer is
+ * both inaccurate and ineligible for rich results. Specifications go in as
+ * additionalProperty so the numbers are machine-readable.
  */
-export function equipmentJsonLd(params: {
-  locale: Locale;
-  name: string;
-  description: string | null;
-  manufacturer: string;
-  model: string;
-  slug: string;
-  imageKeys: string[];
-  dailyRateHalalas: Halalas | null;
-  inStock: boolean;
-  reviews?: { count: number; averageRating: number } | undefined;
-}) {
-  const { locale } = params;
-
+export function machineServiceJsonLd(locale: Locale, machine: Machine, path: string): JsonLd {
+  const image = IMAGES[`equipment/${machine.slug}` as keyof typeof IMAGES];
   return {
     "@context": "https://schema.org",
-    "@type": "Product",
-    name: params.name,
-    ...(params.description ? { description: params.description } : {}),
-    brand: { "@type": "Brand", name: params.manufacturer },
-    model: params.model,
-    sku: params.slug,
-    image: params.imageKeys.map((key) => url(`/api/media/${key}`)),
-    ...(params.dailyRateHalalas !== null
-      ? {
-          offers: {
-            "@type": "Offer",
-            url: url(`/${locale}/equipment/item/${params.slug}`),
-            priceCurrency: env.CURRENCY,
-            price: (Number(params.dailyRateHalalas) / 100).toFixed(2),
-            priceValidUntil: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
-            availability: params.inStock
-              ? "https://schema.org/InStock"
-              : "https://schema.org/OutOfStock",
-            // Rental, not sale. Declaring the business function correctly stops
-            // Google presenting a day rate as a purchase price.
-            businessFunction: "https://schema.org/LeaseOut",
-          },
-        }
-      : {}),
-    // Emitted ONLY when verified reviews exist. Never fabricated.
-    ...(params.reviews && params.reviews.count > 0
-      ? {
-          aggregateRating: {
-            "@type": "AggregateRating",
-            ratingValue: params.reviews.averageRating.toFixed(1),
-            reviewCount: params.reviews.count,
-          },
-        }
-      : {}),
+    "@type": "Service",
+    "@id": `${absoluteUrl(locale, path)}#service`,
+    serviceType: locale === "ar" ? "تأجير معدات ثقيلة" : "Heavy equipment rental",
+    name: locale === "ar" ? `تأجير ${machine.name.ar}` : `${machine.name.en} rental`,
+    description: machine.description[locale],
+    url: absoluteUrl(locale, path),
+    ...(image ? { image: `${SITE_URL}${image.src}` } : {}),
+    provider: { "@id": ORG_ID },
+    areaServed: SERVICE_AREAS.map((area) => ({ "@type": "City", name: area.city[locale] })),
+    additionalProperty: formattedSpecs(machine, locale).map((spec) => ({
+      "@type": "PropertyValue",
+      name: spec.label,
+      value: spec.value,
+    })),
   };
 }
 
-export function breadcrumbJsonLd(items: { name: string; path: string }[]) {
+export function itemListJsonLd(locale: Locale, items: { name: string; path: string }[]): JsonLd {
   return {
     "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
+    "@type": "ItemList",
     itemListElement: items.map((item, index) => ({
       "@type": "ListItem",
       position: index + 1,
       name: item.name,
-      item: url(item.path),
+      url: absoluteUrl(locale, item.path),
     })),
   };
 }
 
-export function faqJsonLd(faqs: { question: string; answer: string }[]) {
-  if (faqs.length === 0) return null;
+export function faqJsonLd(locale: Locale, faqs: Faq[]): JsonLd {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
     mainEntity: faqs.map((faq) => ({
       "@type": "Question",
-      name: faq.question,
-      acceptedAnswer: { "@type": "Answer", text: faq.answer },
+      name: faq.question[locale],
+      acceptedAnswer: { "@type": "Answer", text: faq.answer[locale] },
     })),
   };
 }
 
-export function articleJsonLd(params: {
-  locale: Locale;
-  title: string;
-  description: string | null;
-  slug: string;
-  publishedAt: Date | null;
-  updatedAt: Date;
-  authorName: string;
-}) {
+export function articleJsonLd(locale: Locale, guide: Guide, path: string): JsonLd {
   return {
     "@context": "https://schema.org",
     "@type": "Article",
-    headline: params.title,
-    ...(params.description ? { description: params.description } : {}),
-    inLanguage: params.locale === "ar" ? "ar-SA" : "en-SA",
-    mainEntityOfPage: url(`/${params.locale}/guides/${params.slug}`),
-    ...(params.publishedAt ? { datePublished: params.publishedAt.toISOString() } : {}),
-    dateModified: params.updatedAt.toISOString(),
-    author: { "@type": "Organization", name: params.authorName },
-    publisher: { "@id": url("/#organization") },
+    headline: guide.title[locale],
+    description: guide.excerpt[locale],
+    inLanguage: locale === "ar" ? "ar-SA" : "en-SA",
+    dateModified: guide.updated,
+    datePublished: guide.updated,
+    url: absoluteUrl(locale, path),
+    mainEntityOfPage: absoluteUrl(locale, path),
+    image: `${SITE_URL}/og/default.jpg`,
+    author: { "@id": ORG_ID },
+    publisher: { "@id": ORG_ID },
   };
 }
 
 /**
- * LocalBusiness for a branch page.
- *
- * Emitted only for branches that genuinely serve customers — `isServiceArea`
- * gates both the page and this markup, which is what keeps location SEO
- * honest rather than a doorway-page farm.
+ * Serialise for a <script type="application/ld+json"> block. `<` is escaped so
+ * a string containing "</script>" cannot close the tag early — content here is
+ * ours, but the escape costs nothing and removes the class of bug.
  */
-export function branchJsonLd(params: {
-  locale: Locale;
-  slug: string;
-  name: string;
-  city: string;
-  region: string;
-  address: string;
-  phone: string | null;
-  latitude: string | null;
-  longitude: string | null;
-}) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    "@id": url(`/${params.locale}/locations/${params.slug}#branch`),
-    name: params.name,
-    address: {
-      "@type": "PostalAddress",
-      streetAddress: params.address,
-      addressLocality: params.city,
-      addressRegion: params.region,
-      addressCountry: "SA",
-    },
-    ...(params.phone ? { telephone: params.phone } : {}),
-    ...(params.latitude && params.longitude
-      ? {
-          geo: {
-            "@type": "GeoCoordinates",
-            latitude: params.latitude,
-            longitude: params.longitude,
-          },
-        }
-      : {}),
-    parentOrganization: { "@id": url("/#organization") },
-  };
+export function serializeJsonLd(data: JsonLd | JsonLd[]): string {
+  return JSON.stringify(data).replace(/</g, "\\u003c");
 }
-
