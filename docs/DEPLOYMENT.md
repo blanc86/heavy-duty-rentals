@@ -36,12 +36,9 @@ canonical tag points at a redirect.
 
 ### Left over from the booking platform
 
-The Vercel project still has the booking platform's environment variables
-(`DATABASE_URL` and the `EU_*` Neon variables, `ENCRYPTION_KEY`, `APP_SECRET`,
-`PAYMENT_PROVIDER`, `DEMO_MODE`, `EMAIL_FROM` and so on) and the Neon database it
-used. Nothing reads them any more. They can be deleted, along with the database,
-once nobody needs the old platform's data — the code is preserved at the
-`booking-platform-final` tag.
+The booking platform's environment variables were removed from the Vercel
+project on 2026-09-14, and its Neon database (`hdr-frankfurt`) was disconnected
+from it. The code is preserved at the `booking-platform-final` tag.
 
 ---
 
