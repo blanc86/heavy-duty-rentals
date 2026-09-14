@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { keepNumbersWithUnits } from "@/lib/text";
 import sitemap from "@/app/sitemap";
 import { BUSINESS, SERVICE_AREAS } from "@/content/business";
 import { MACHINES } from "@/content/catalog";
@@ -118,5 +119,13 @@ describe("structured data", () => {
 
   it("escapes < so no string can close its script tag", () => {
     expect(serializeJsonLd({ name: "</script><script>alert(1)</script>" })).not.toContain("</script>");
+  });
+});
+
+describe("text", () => {
+  it("keeps figures with their units, in both scripts", () => {
+    expect(keepNumbersWithUnits("a 100 t crane over 3.2 km")).toBe("a 100 t crane over 3.2 km");
+    expect(keepNumbersWithUnits("رافعة بحمولة 300 طن")).toBe("رافعة بحمولة 300 طن");
+    expect(keepNumbersWithUnits("between 20 30")).toBe("between 20 30");
   });
 });

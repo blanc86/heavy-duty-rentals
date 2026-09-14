@@ -49,7 +49,7 @@ export function ContactDock({ locale, dict }: { locale: Locale; dict: Dictionary
             </a>
           </li>
           <li className="flex flex-1">
-            <Link href={href(locale, "/contact")} className={`${itemClass} bg-machine-500 text-steel-950`}>
+            <Link href={href(locale, "/contact")} className={`${itemClass} bg-brand-500 text-steel-950`}>
               <QuoteIcon />
               {dict.mobileBar.quote}
             </Link>

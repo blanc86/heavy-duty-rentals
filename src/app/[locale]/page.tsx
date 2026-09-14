@@ -12,10 +12,13 @@ import {
   ServiceAreaLinks,
   WhyChooseUs,
 } from "@/components/marketing/sections";
+import { CertificationsSection } from "@/components/trust/certifications-section";
+import { ProjectCard } from "@/components/trust/project-card";
 import { ActionLink, ButtonLink, CheckIcon, Container, PhoneIcon, SectionHeading, WhatsAppIcon } from "@/components/ui";
 import { BUSINESS } from "@/content/business";
 import { FAQS } from "@/content/faqs";
 import { activeCategories, featuredMachines } from "@/lib/catalog";
+import { featuredProjects } from "@/lib/projects";
 import { telHref, whatsappHref } from "@/lib/contact";
 import { getDictionary } from "@/lib/i18n";
 import { isLocale, type Locale } from "@/lib/i18n/config";
@@ -45,7 +48,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
  *   2. Categories: visitors self-select immediately (Kennards, Byrne).
  *   3. How renting works: removes "what happens if I call?" — the hesitation a
  *      site without online booking has to answer explicitly.
- *   4. Why us: supported claims only.
+ *   4. Why us, then the evidence for it: certifications a procurement team
+ *      files, and projects that show the kind of work the fleet does.
  *   5. Featured machines: breadth of the range, each one enquire-able.
  *   6. Where we work, FAQs, guides — for the visitor still deciding.
  *   7. Contact band: every page ends with a way to act.
@@ -88,7 +92,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2">
               {dict.home.heroFacts.map((fact) => (
                 <li key={fact} className="flex items-center gap-2 font-semibold text-white">
-                  <CheckIcon className="h-[1.1rem] w-[1.1rem] text-machine-500" />
+                  <CheckIcon className="h-[1.1rem] w-[1.1rem] text-brand-500" />
                   {fact}
                 </li>
               ))}
@@ -105,7 +109,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </div>
             <p className="mt-4 text-steel-300">
               {dict.home.heroCallPrefix}{" "}
-              <a href={telHref()} className="inline-flex items-center gap-1.5 font-semibold text-white underline underline-offset-4 hover:text-machine-300">
+              <a href={telHref()} className="inline-flex items-center gap-1.5 font-semibold text-white underline underline-offset-4 hover:text-brand-300">
                 <PhoneIcon className="h-4 w-4" />
                 <span className="ltr-nums">{BUSINESS.phone.display}</span>
               </a>
@@ -140,6 +144,27 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       </div>
 
       <WhyChooseUs dict={dict} />
+
+      <CertificationsSection locale={locale} dict={dict} />
+
+      {/* PROJECTS ----------------------------------------------------------- */}
+      <section aria-labelledby="projects" className="border-t border-steel-200 bg-steel-50 py-20 sm:py-24">
+        <Container>
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <SectionHeading id="projects" title={dict.projects.homeTitle} intro={dict.projects.homeIntro} />
+            <ButtonLink variant="outline" href={href(locale, "/projects")} className="shrink-0 self-start md:self-auto">
+              {dict.projects.viewAll}
+            </ButtonLink>
+          </div>
+          <ul className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {featuredProjects().map((project) => (
+              <li key={project.slug} className="flex">
+                <ProjectCard project={project} locale={locale} dict={dict} className="w-full" />
+              </li>
+            ))}
+          </ul>
+        </Container>
+      </section>
 
       {/* FEATURED ----------------------------------------------------------- */}
       <section aria-labelledby="featured" className="py-20 sm:py-24">

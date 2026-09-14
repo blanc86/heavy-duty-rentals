@@ -4,6 +4,7 @@ import { CategoryTile } from "@/components/equipment/category-tile";
 import { SiteImage } from "@/components/equipment/machine-image";
 import { ContactBand, PageHeader, ServiceAreaLinks } from "@/components/marketing/sections";
 import { JsonLd } from "@/components/seo/json-ld";
+import { CertificationsSection } from "@/components/trust/certifications-section";
 import { CheckIcon, Container, MinusIcon } from "@/components/ui";
 import { BUSINESS } from "@/content/business";
 import { activeCategories } from "@/lib/catalog";
@@ -33,7 +34,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
  * been provided, and an invented one would be the first thing a procurement
  * team discovered. The company registration block appears once CR and VAT
  * numbers are supplied; in Saudi Arabia those are a trust signal in their own
- * right.
+ * right. Certifications sit here as well as on the home page, because About is
+ * where a supplier-approval checklist sends people.
  */
 export default async function AboutPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: raw } = await params;
@@ -82,7 +84,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
             <p className="mt-3 text-lg text-steel-700">{dict.about.safetyIntro}</p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-2">
-            <div className="rounded-card border-t-4 border-machine-500 bg-white p-6">
+            <div className="rounded-card border-t-4 border-brand-500 bg-white p-6">
               <h3 className="text-[1.6rem]">{dict.about.weProvideTitle}</h3>
               <ul className="mt-4 space-y-3">
                 {dict.about.weProvide.map((item) => (
@@ -108,7 +110,9 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
         </Container>
       </section>
 
-      <section aria-labelledby="range" className="py-14 sm:py-20">
+      <CertificationsSection locale={locale} dict={dict} />
+
+      <section aria-labelledby="range" className="border-t border-steel-200 py-14 sm:py-20">
         <Container>
           <h2 id="range" className="text-h2">
             {dict.equipment.indexTitle}

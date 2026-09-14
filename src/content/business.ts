@@ -32,9 +32,10 @@ export interface PhoneNumber {
 }
 
 export interface BusinessDetails {
+  /** The trading name, as the logo writes it. */
   name: Localized;
-  /** Legal entity name, for the footer and structured data. Null until provided. */
-  legalName: string | null;
+  /** Legal entity name, for the footer, legal pages and structured data. */
+  legalName: Localized | null;
   phone: PhoneNumber;
   /** The number that receives WhatsApp messages. Often the same as `phone`. */
   whatsapp: PhoneNumber;
@@ -53,8 +54,10 @@ export interface BusinessDetails {
 }
 
 export const BUSINESS: BusinessDetails = {
-  name: { en: "Heavy Duty Rentals", ar: "هيفي ديوتي للتأجير" },
-  legalName: null,
+  // Both names are as they appear on the company logo supplied by the business
+  // (public/brand), which is the source for them.
+  name: { en: "TechSteps", ar: "تكستيب" },
+  legalName: { en: "Technical Steps for Equipment Rental Est.", ar: "مؤسسة خطوات التقنية لتأجير المعدات" },
   phone: { display: "+966 5X XXX XXXX", digits: "966500000000" },
   whatsapp: { display: "+966 5X XXX XXXX", digits: "966500000000" },
   email: "info@example.com",
@@ -70,14 +73,22 @@ export const BUSINESS: BusinessDetails = {
  * What the business still needs to supply. Kept next to the data so the two
  * are edited together.
  */
-export const PLACEHOLDER_FIELDS: readonly (keyof BusinessDetails | "fleet" | "serviceAreas" | "testimonials" | "photos" | "domain")[] = [
+export const PLACEHOLDER_FIELDS: readonly (
+  | keyof BusinessDetails
+  | "fleet"
+  | "serviceAreas"
+  | "testimonials"
+  | "photos"
+  | "domain"
+  | "certifications"
+  | "projects"
+)[] = [
   "phone",
   "whatsapp",
   "email",
   "address",
   "mapsUrl",
   "hours",
-  "legalName",
   "crNumber",
   "vatNumber",
   "foundedYear",
@@ -86,6 +97,8 @@ export const PLACEHOLDER_FIELDS: readonly (keyof BusinessDetails | "fleet" | "se
   "testimonials",
   "photos",
   "domain",
+  "certifications",
+  "projects",
 ];
 
 /**

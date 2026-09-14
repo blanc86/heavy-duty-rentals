@@ -16,9 +16,9 @@ import { RatingPlate } from "./rating-plate";
  * The whole card opens the machine's page (a stretched link on the title, so
  * there is one link rather than a card-shaped one wrapping a button). The one
  * action on the card itself is WhatsApp, prefilled with the machine's name —
- * the shortest path from "that's the one" to a conversation. The yellow quote
+ * the shortest path from "that's the one" to a conversation. The orange quote
  * button lives on the machine page, so a grid of twelve cards is not a wall of
- * yellow competing with itself.
+ * orange competing with itself.
  */
 export function MachineCard({
   machine,

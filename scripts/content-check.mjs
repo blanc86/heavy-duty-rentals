@@ -24,7 +24,6 @@ const WHAT = {
   address: "Office or yard address — contact page, and switches structured data to LocalBusiness",
   mapsUrl: "Google Maps link — the Get directions link on the contact page",
   hours: "Business hours — contact page",
-  legalName: "Registered company name — footer and legal pages",
   crNumber: "Commercial registration number — footer and About page (a trust signal in KSA)",
   vatNumber: "VAT number — footer and About page",
   foundedYear: "Year operations began — About page, only if the business wants it shown",
@@ -33,6 +32,8 @@ const WHAT = {
   testimonials: "Customer quotes or client logos, with written permission to publish",
   photos: "Photographs of the business's own machines, to replace the illustrative ones",
   domain: "The real domain — set NEXT_PUBLIC_SITE_URL so canonicals and the sitemap use it",
+  certifications: "Real certificates (scan, issuer, number, expiry) to replace the samples in src/content/certifications.ts",
+  projects: "Real completed projects, with photographs, to replace the samples in src/content/projects.ts",
 };
 
 if (fields.length === 0) {
@@ -41,4 +42,13 @@ if (fields.length === 0) {
   console.log(`${fields.length} item(s) still needed from the business:\n`);
   for (const field of fields) console.log(`  - ${WHAT[field] ?? field}`);
   console.log("\nEdit src/content/business.ts, then remove each field from PLACEHOLDER_FIELDS.");
+}
+
+for (const [file, label] of [
+  ["certifications.ts", "certificate"],
+  ["projects.ts", "project"],
+]) {
+  const text = await readFile(path.join(root, "src/content", file), "utf8");
+  const samples = text.match(/^\s*sample: true,/gm)?.length ?? 0;
+  if (samples) console.log(`${samples} sample ${label}${samples === 1 ? "" : "s"} still in src/content/${file}.`);
 }

@@ -30,6 +30,8 @@ src/
     business.ts           phone, WhatsApp, email, address, CR/VAT, service areas
     catalog.ts            categories and machines, with specs
     specs.ts              spec labels, units and formatting
+    certifications.ts     certificates (samples until real scans are supplied)
+    projects.ts           completed projects (samples until real ones are supplied)
     faqs.ts  guides.ts  legal.ts
     images.json           every photo: source, author, licence, crop, alt text
     images.generated.ts   GENERATED from images.json — do not edit
@@ -46,9 +48,12 @@ src/
     layout/               header, footer, mobile menu, mobile contact bar
     equipment/            machine card, rating plate, spec table, fleet strip
     marketing/sections.tsx  how it works, why us, FAQ list, contact band…
+    trust/                certifications section and viewer, project card
     contact/enquiry-form.tsx  the quote form
     ui/index.tsx          buttons, container, icons
   proxy.ts                redirects bare "/" to /en or /ar
+public/
+  brand/                  the TechSteps logo, extracted from the supplied artwork
 scripts/                  image build, content check, route and a11y audits
 tests/                    content integrity, contact links, SEO
 ```
@@ -102,6 +107,25 @@ regenerates `images.generated.ts` and the social sharing image.
 
 Only use photos whose licence allows commercial use, and record the author and
 licence: `/image-credits` is generated from the manifest and the tests check it.
+
+### Replace a sample certificate or project
+
+Both files explain the steps at the top: `src/content/certifications.ts` and
+`src/content/projects.ts`. In short, fill in the real details, add the scan or
+photograph, and set `sample: false`. The "Sample" label and the specimen
+watermark disappear by themselves, and the tests check that a real certificate
+has its issuer, number, expiry date and file.
+
+Only mark an entry `sample: false` when it describes something real.
+
+### The logo
+
+`public/brand/` holds the logo in each form the site uses: `logo-en` and
+`logo-ar` (each language's half), `-on-dark` versions with white ink, `mark`,
+and `logo-full` (bilingual, used for the sharing image and `logo.png`). They
+are vector extractions of the supplied artwork; to change the logo, replace
+these files and run `npm run images:prepare` to rebuild the sharing image. The
+favicon is `src/app/icon.svg`.
 
 ### Change wording
 
@@ -169,6 +193,10 @@ image that is the page's Largest Contentful Paint (`SiteImage preload`) and
 
 **Never hand-replace a file in `public/images`.** Images are cached for a year as
 immutable; a changed photo needs a new file name, which the image script gives it.
+
+**No filter, transform or backdrop-filter on the header.** Any of them makes
+the header the containing block for `position: fixed` descendants, and the
+full-screen mobile menu inside it shrinks to the header's height.
 
 **The mobile contact bar reserves its own space.** `<body>` has bottom padding
 below the `md` breakpoint so the fixed bar never covers the footer. A new fixed

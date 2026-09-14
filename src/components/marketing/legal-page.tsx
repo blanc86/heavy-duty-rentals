@@ -28,7 +28,7 @@ export function LegalPage({
   ];
   // Placeholders are filled as plain text; the Markdown renderer escapes them.
   const text = body[locale]
-    .replaceAll("{company}", BUSINESS.legalName ?? BUSINESS.name[locale])
+    .replaceAll("{company}", BUSINESS.legalName?.[locale] ?? BUSINESS.name[locale])
     .replaceAll("{email}", BUSINESS.email);
 
   return (

@@ -42,6 +42,8 @@ const SIZES = {
   equipment: { width: 1600, height: 1200, quality: 80 },
   hero: { width: 2400, height: 1350, quality: 76 },
   banner: { width: 2000, height: 1125, quality: 76 },
+  // Projects are sites, not machines: wider than the 4:3 equipment frame.
+  project: { width: 1600, height: 1000, quality: 78 },
 };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -230,8 +232,8 @@ async function main() {
 
 /**
  * The image shown when a page is shared on WhatsApp, LinkedIn or X. Built from
- * the hero photograph with a steel gradient and the company name, because a
- * bare photo of an excavator says nothing about who is renting it.
+ * the hero photograph with a steel gradient and the company's bilingual logo,
+ * because a bare photo of an excavator says nothing about who is renting it.
  */
 async function buildOgImage(hero) {
   const width = 1200;
@@ -246,16 +248,19 @@ async function buildOgImage(hero) {
         </linearGradient>
       </defs>
       <rect width="100%" height="100%" fill="url(#g)"/>
-      <rect x="72" y="92" width="64" height="10" fill="#f4b000"/>
+      <rect x="72" y="92" width="64" height="10" fill="#f68734"/>
       <text x="72" y="190" font-family="Arial Narrow, Arial, sans-serif" font-weight="700" font-size="72" fill="#ffffff">Heavy equipment</text>
       <text x="72" y="270" font-family="Arial Narrow, Arial, sans-serif" font-weight="700" font-size="72" fill="#ffffff">rental in Saudi Arabia</text>
       <text x="72" y="340" font-family="Arial, sans-serif" font-size="30" fill="#c3cad3">Cranes, excavators, forklifts, manlifts and generators</text>
-      <text x="72" y="540" font-family="Arial, sans-serif" font-weight="700" font-size="34" fill="#ffffff">Heavy Duty Rentals</text>
     </svg>`);
   await mkdir(path.join(PUBLIC, "og"), { recursive: true });
+  const logo = await sharp(path.join(PUBLIC, "brand", "logo-full-on-dark.svg"), { density: 144 })
+    .resize({ width: 620 })
+    .png()
+    .toBuffer();
   await sharp(path.join(PUBLIC, hero.src))
     .resize(width, height, { fit: "cover", position: "centre" })
-    .composite([{ input: overlay }])
+    .composite([{ input: overlay }, { input: logo, left: 72, top: 440 }])
     .jpeg({ quality: 82, mozjpeg: true })
     .toFile(path.join(PUBLIC, "og", "default.jpg"));
   console.log("  og/default.jpg                           1200x630");

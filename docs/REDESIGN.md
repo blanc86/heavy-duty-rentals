@@ -139,9 +139,11 @@ each main template at desktop and phone sizes, with Lighthouse accessibility at
 
 ## 5. Design direction
 
-Industrial, not construction-site cliché. Steel greys with a single safety
-yellow (`#F4B000`) used for the primary action and focus rings, and a WhatsApp
-green dark enough for white text to pass contrast. Barlow Condensed for
+Industrial, not construction-site cliché. Steel greys with a single accent —
+TechSteps orange (`#F68734`), taken from the company's logo — used for the
+primary action, and a WhatsApp green dark enough for white text to pass
+contrast. Orange carries dark text only (7:1); focus rings use the logo's
+deeper orange (`#DC6836`), which clears 3:1 on both white and steel. Barlow Condensed for
 headings — the narrow, sturdy letterforms of equipment plates and signage — with
 Barlow for body text and IBM Plex Sans Arabic for Arabic.
 
@@ -208,7 +210,6 @@ Run `npm run content:check` for the live list. Placeholders are visibly fake
 | Office or yard address | Contact page; switches structured data to LocalBusiness |
 | Google Maps link | "Get directions" on the contact page |
 | Business hours | Contact page |
-| Registered company name | Footer, legal pages |
 | Commercial registration (CR) number | Footer, About page |
 | VAT number | Footer, About page |
 | Year operations began | About page, only if the business wants it shown |
@@ -216,9 +217,79 @@ Run `npm run content:check` for the live list. Placeholders are visibly fake
 | Confirmation of service cities | `SERVICE_AREAS` in `src/content/business.ts` |
 | Customer testimonials or client logos | With written permission to publish |
 | Photographs of the business's own machines | Replace the illustrative images |
-| Logo | `src/components/layout/logo.tsx` is a placeholder mark |
+| Real certificates | Scans with issuer, number and expiry, replacing the samples — see §8 |
+| Real completed projects | With photographs, replacing the samples — see §8 |
 | Domain | Set `NEXT_PUBLIC_SITE_URL` |
 
 The privacy policy and terms (`src/content/legal.ts`) are a plain-language
 starting point and **must be reviewed by a Saudi lawyer**, particularly against
 the PDPL, before launch.
+
+---
+
+## 8. Brand, certifications and projects (2026-09-15)
+
+### The logo
+
+The business supplied its logo as an Illustrator PDF: **TECHSTEPS / تكستيب**,
+*Technical Steps for Equipment Rental Est. / مؤسسة خطوات التقنية لتأجير
+المعدات*. It became the source of truth for the name and legal name
+(`src/content/business.ts`), replacing the placeholder "Heavy Duty Rentals".
+
+The artwork was extracted from the PDF as vectors, not traced, into
+`public/brand/`. The letterhead decorations on the PDF page were left out.
+
+| Where | What is shown |
+|---|---|
+| Header | The half of the bilingual logo that reads in the page's language: TECHSTEPS + mark on English pages, mark + تكستيب on Arabic pages. Below 380 px, the mark alone, so the call and menu buttons keep their room |
+| Mobile menu | The same, beside the close button |
+| Footer | White-ink version on steel, with the legal name beneath |
+| Favicon, Apple touch icon | The gear-crane-steps mark on white |
+| Social sharing image | The full bilingual logo |
+| Structured data | `public/brand/logo.png` as the Organization logo |
+
+The site's accent colour moved from safety yellow to the logo's orange so the
+brand reads as one thing.
+
+### Certifications — samples
+
+A section of the certifications an equipment rental business in the Kingdom is
+commonly asked for in tenders: ISO 9001, ISO 45001, ISO 14001, third-party
+inspection of lifting equipment, and operator certification. It sits on the
+home page and on About (`/about#certifications`).
+
+The brief asked for sample certificates sourced from the internet. Real
+certificates found online are issued to other named companies, and
+certification marks (ISO, IAF, accreditation and inspection bodies) may only
+appear on certificates those bodies actually issued. Publishing either would
+present another company's certificate, or a body's mark, as this business's.
+So the samples are **generic specimen certificates drawn in SVG**, with a
+SPECIMEN watermark, placeholder numbers and dates, and "Certification body" in
+place of any real issuer. Each card is also labelled **Sample**.
+
+To replace one, follow the steps at the top of
+`src/content/certifications.ts`. A test refuses a non-sample entry without an
+issuer, number, expiry date and an existing scan.
+
+### Completed projects — samples
+
+Six illustrative projects across the five service cities, covering industrial
+lifting, a solar plant, warehouse steel, a pipeline, heavy transport and site
+preparation. Each lists the client by sector, location, year, duration, what
+was supplied, key figures, and the machines used, linked to their pages. They
+appear on `/projects`, as three cards on the home page, and on each city's page.
+
+None describes work the business has done, so each is labelled **Sample**, and
+`npm run content:check` counts them. No client is named. The photographs are
+licensed Unsplash images chosen to match each scenario, checked by eye for
+rental-company branding: two company names painted on machines are blurred.
+Photos that carried a rental company's name or phone number were rejected.
+
+To replace them, follow the steps at the top of `src/content/projects.ts`.
+
+### Fixed along the way
+
+The mobile menu opened at the height of the header bar, so its links and
+contact buttons were cut off. The header's translucent `backdrop-filter` made it
+the containing block for the full-screen panel. The header is now solid white,
+and the accessibility audit checks that the open menu fills the screen.

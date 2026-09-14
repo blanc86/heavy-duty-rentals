@@ -39,9 +39,9 @@ export function organizationJsonLd(locale: Locale): JsonLd {
     "@id": ORG_ID,
     name: BUSINESS.name[locale],
     alternateName: BUSINESS.name[locale === "en" ? "ar" : "en"],
-    ...(BUSINESS.legalName && !isPlaceholder("legalName") ? { legalName: BUSINESS.legalName } : {}),
+    ...(BUSINESS.legalName ? { legalName: BUSINESS.legalName[locale] } : {}),
     url: absoluteUrl(locale),
-    logo: `${SITE_URL}/icon.svg`,
+    logo: `${SITE_URL}/brand/logo.png`,
     image: `${SITE_URL}/og/default.jpg`,
     description:
       locale === "ar"

@@ -1,6 +1,10 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { BUSINESS, PLACEHOLDER_FIELDS, SERVICE_AREAS } from "@/content/business";
 import { CATEGORIES, MACHINES } from "@/content/catalog";
+import { CERTIFICATIONS } from "@/content/certifications";
+import { PROJECTS } from "@/content/projects";
 import { FAQS } from "@/content/faqs";
 import { GUIDES } from "@/content/guides";
 import { IMAGES } from "@/content/images.generated";
@@ -9,6 +13,9 @@ import { formattedSpecs, formatSpecValue, SPEC_DEFINITIONS } from "@/content/spe
 import { activeCategories, featuredMachines, machineCount, plateFor } from "@/lib/catalog";
 import { ar } from "@/lib/i18n/dictionaries/ar";
 import { en } from "@/lib/i18n/dictionaries/en";
+import { projectImageKey } from "@/lib/projects";
+
+const root = path.resolve(import.meta.dirname, "..");
 
 /**
  * CONTENT INTEGRITY.
@@ -201,5 +208,93 @@ describe("placeholders", () => {
   it("keeps placeholder numbers visibly fake, so no visitor dials a guess", () => {
     if (PLACEHOLDER_FIELDS.includes("phone")) expect(BUSINESS.phone.display).toContain("X");
     if (PLACEHOLDER_FIELDS.includes("email")) expect(BUSINESS.email).toMatch(/@example\.(com|org|net)$/);
+  });
+});
+
+describe("brand", () => {
+  it("names the business as its logo does, in both languages", () => {
+    expect(BUSINESS.name.en).toBe("TechSteps");
+    expect(BUSINESS.name.ar).toBe("تكستيب");
+    expect(BUSINESS.legalName?.en).toBe("Technical Steps for Equipment Rental Est.");
+    expect(BUSINESS.legalName?.ar).toMatch(/[؀-ۿ]/);
+  });
+
+  it("ships every logo file the header, footer and menu ask for", () => {
+    const files = ["logo-en", "logo-ar", "logo-en-on-dark", "logo-ar-on-dark", "logo-full-on-dark", "mark", "mark-on-dark"];
+    for (const file of files) expect(existsSync(path.join(root, "public/brand", `${file}.svg`)), file).toBe(true);
+    expect(existsSync(path.join(root, "public/brand/logo.png"))).toBe(true);
+  });
+});
+
+describe("projects", () => {
+  const machineSlugs = new Set(MACHINES.map((m) => m.slug));
+  const areaSlugs = new Set(SERVICE_AREAS.map((a) => a.slug));
+
+  it("uses unique, URL-safe slugs", () => {
+    const slugs = PROJECTS.map((p) => p.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    for (const slug of slugs) expect(slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+  });
+
+  it("places every project in a service area and links only machines that exist", () => {
+    for (const project of PROJECTS) {
+      expect(areaSlugs, project.slug).toContain(project.area);
+      expect(project.equipment.length, project.slug).toBeGreaterThan(0);
+      for (const slug of project.equipment) expect(machineSlugs, `${project.slug}: ${slug}`).toContain(slug);
+    }
+  });
+
+  it("gives every project a 16:10 photograph with alt text in both languages", () => {
+    for (const project of PROJECTS) {
+      const image = IMAGES[projectImageKey(project.slug)];
+      expect(image, `no image for ${project.slug}`).toBeDefined();
+      expect(image.width / image.height).toBeCloseTo(16 / 10, 2);
+      expect(image.alt.en.length, project.slug).toBeGreaterThan(15);
+      expect(image.alt.ar, project.slug).toMatch(/[؀-ۿ]/);
+    }
+  });
+
+  it("writes every project in both languages, with the same number of lines", () => {
+    for (const project of PROJECTS) {
+      for (const field of [project.title, project.type, project.client, project.location, project.duration, project.summary]) {
+        expect(field.en.length, project.slug).toBeGreaterThan(1);
+        expect(field.ar, project.slug).toMatch(/[؀-ۿ\d]/);
+      }
+      expect(project.scope.ar).toHaveLength(project.scope.en.length);
+      expect(project.facts.length, project.slug).toBeGreaterThan(0);
+      expect(project.year).toBeGreaterThanOrEqual(2000);
+      expect(project.year).toBeLessThanOrEqual(new Date().getFullYear());
+    }
+  });
+
+  it("lists every sample in content:check, so none reaches launch unnoticed", () => {
+    if (PROJECTS.some((p) => p.sample)) expect(PLACEHOLDER_FIELDS).toContain("projects");
+  });
+});
+
+describe("certifications", () => {
+  it("uses unique slugs and translates every field", () => {
+    const slugs = CERTIFICATIONS.map((c) => c.slug);
+    expect(new Set(slugs).size).toBe(slugs.length);
+    for (const c of CERTIFICATIONS) {
+      expect(c.title.ar, c.slug).toMatch(/[؀-ۿ]/);
+      expect(c.summary.ar, c.slug).toMatch(/[؀-ۿ]/);
+      expect(c.standard.ar.length, c.slug).toBeGreaterThan(2);
+    }
+  });
+
+  it("refuses a real certificate without its issuer, number, expiry and file", () => {
+    for (const c of CERTIFICATIONS.filter((entry) => !entry.sample)) {
+      expect(c.issuer, c.slug).not.toBeNull();
+      expect(c.certificateNumber, c.slug).toBeTruthy();
+      expect(c.validUntil, c.slug).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(c.image, c.slug).not.toBeNull();
+      if (c.image) expect(existsSync(path.join(root, "public", c.image.src)), c.image.src).toBe(true);
+      if (c.pdf) expect(existsSync(path.join(root, "public", c.pdf)), c.pdf).toBe(true);
+    }
+  });
+
+  it("lists samples in content:check", () => {
+    if (CERTIFICATIONS.some((c) => c.sample)) expect(PLACEHOLDER_FIELDS).toContain("certifications");
   });
 });

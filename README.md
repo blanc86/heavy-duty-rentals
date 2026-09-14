@@ -1,6 +1,7 @@
-# Heavy Duty Rentals
+# TechSteps — تكستيب
 
-A bilingual (English/Arabic) website for a heavy-equipment rental business in
+The bilingual (English/Arabic) website of Technical Steps for Equipment Rental
+Est. (مؤسسة خطوات التقنية لتأجير المعدات), a heavy-equipment rental business in
 Saudi Arabia: cranes, excavators, forklifts, access platforms, generators and
 low-bed transport. It shows the fleet with specifications and turns visitors
 into phone calls, WhatsApp conversations and quote requests.
@@ -8,8 +9,9 @@ into phone calls, WhatsApp conversations and quote requests.
 **Live demo:** <https://heavy-duty-rentals.vercel.app>
 
 > **Not ready for launch yet.** Contact details are placeholders
-> (`+966 5X XXX XXXX`, `info@example.com`) and the equipment photos are licensed
-> stock, not the business's own machines. Run `npm run content:check` for the
+> (`+966 5X XXX XXXX`, `info@example.com`), the equipment photos are licensed
+> stock rather than the business's own machines, and the certificates and
+> completed projects are clearly labelled samples. Run `npm run content:check` for the
 > list of what is still needed, and see
 > [docs/REDESIGN.md §7](docs/REDESIGN.md#7-needed-from-the-business-before-launch).
 
@@ -25,6 +27,10 @@ into phone calls, WhatsApp conversations and quote requests.
   request (machine, site, dates, operator) for the visitor to send.
 - **The fleet, properly specified.** 18 machines in 14 categories, each with key
   specifications, a typical model, and what the hire does and does not include.
+- **Trust, shown rather than claimed.** Certificates presented as documents a
+  procurement team can open, and completed projects with the client sector,
+  location, figures and machines used. Both are samples until the business
+  supplies its own — see [docs/REDESIGN.md §8](docs/REDESIGN.md#8-brand-certifications-and-projects-2026-09-15).
 - **Local SEO in both languages.** Arabic is a full locale with its own URLs,
   translated slugs and right-to-left layout. City pages, buying guides, FAQs,
   structured data, `hreflang`, a sitemap.
@@ -98,6 +104,7 @@ Tailwind CSS v4 · Vitest · Playwright + axe-core for audits · sharp for image
 1. Real contact details, address, hours, CR and VAT numbers in
    `src/content/business.ts`.
 2. Confirm the machine list and service cities match what the business offers.
-3. Photographs of the business's own machines, and its logo.
-4. `NEXT_PUBLIC_SITE_URL` set to the real domain.
-5. Privacy policy and terms reviewed by a Saudi lawyer.
+3. Photographs of the business's own machines.
+4. Real certificates and completed projects, replacing the samples.
+5. `NEXT_PUBLIC_SITE_URL` set to the real domain.
+6. Privacy policy and terms reviewed by a Saudi lawyer.

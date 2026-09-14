@@ -401,6 +401,114 @@ export const IMAGES = {
       "license": "Unsplash License",
       "licenseUrl": "https://unsplash.com/license"
     }
+  },
+  "project/jubail-plant-expansion-lifts": {
+    "src": "/images/project/jubail-plant-expansion-lifts.3ee0c1afe4.jpg",
+    "width": 1600,
+    "height": 1000,
+    "blurDataURL": "data:image/jpeg;base64,/9j/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAKABADASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAgMG/8QAIRAAAgEDAwUAAAAAAAAAAAAAAQIDABIhBBETMUFxgYL/xAAUAQEAAAAAAAAAAAAAAAAAAAAD/8QAGBEAAgMAAAAAAAAAAAAAAAAAAREAAgP/2gAMAwEAAhEDEQA/AFaUWNY8SMwPTfHeqcSam8ILWXe4NgD3WaE8qjErjwxoyamcjM0h+jSnazcAY1SM/9k=",
+    "alt": {
+      "en": "Process plant under construction on the coast, with crawler cranes working beside the steel structures",
+      "ar": "مصنع معالجة قيد الإنشاء على الساحل، مع رافعات زاحفة تعمل بجوار الهياكل الحديدية"
+    },
+    "credit": {
+      "author": "Julia Taubitz",
+      "authorUrl": null,
+      "source": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/industrial-complex-with-pipes-and-structures-by-the-water-RlY5ZtptWvM",
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    }
+  },
+  "project/riyadh-solar-plant-lifts": {
+    "src": "/images/project/riyadh-solar-plant-lifts.66bfceb058.jpg",
+    "width": 1600,
+    "height": 1000,
+    "blurDataURL": "data:image/jpeg;base64,/9j/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAKABADASIAAhEBAxEB/8QAFwAAAwEAAAAAAAAAAAAAAAAAAQMEBf/EAB8QAAIBBAIDAAAAAAAAAAAAAAECAwAFERIEMSFRkv/EABUBAQEAAAAAAAAAAAAAAAAAAAED/8QAFxEBAQEBAAAAAAAAAAAAAAAAAQACIf/aAAwDAQACEQMRAD8ArW6zlNjOvwKRNdOfjaMh19qBkVlwHJAPRPVBmZVRlYht8ZB81PKvIv/Z",
+    "alt": {
+      "en": "Aerial view of a solar power plant, with a mobile crane setting a station between rows of panels and trucks waiting to unload",
+      "ar": "منظر جوي لمحطة طاقة شمسية، ورافعة متحركة تركّب محطة بين صفوف الألواح وشاحنات تنتظر التفريغ"
+    },
+    "credit": {
+      "author": "Vlad Burac",
+      "authorUrl": null,
+      "source": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/aerial-view-of-a-solar-panel-field-with-a-crane-QQRumEY3PrM",
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    }
+  },
+  "project/dammam-warehouse-roof-steel": {
+    "src": "/images/project/dammam-warehouse-roof-steel.77f80be0d4.jpg",
+    "width": 1600,
+    "height": 1000,
+    "blurDataURL": "data:image/jpeg;base64,/9j/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAKABADASIAAhEBAxEB/8QAFwAAAwEAAAAAAAAAAAAAAAAAAQIEBf/EACAQAAIBBAEFAAAAAAAAAAAAAAERAAIDEiGBBRMUMdH/xAAUAQEAAAAAAAAAAAAAAAAAAAAC/8QAFREBAQAAAAAAAAAAAAAAAAAAAQD/2gAMAwEAAhEDEQA/AIh0+pP0AdrUHikUZdq4Tx9m3ZDs1PcW4AiFrAlcxqxv/9k=",
+    "alt": {
+      "en": "Two workers on a scissor lift beneath the steel roof trusses of a large building",
+      "ar": "عاملان على منصة مقصية أسفل جمالونات السقف الحديدية لمبنى كبير"
+    },
+    "credit": {
+      "author": "Jimmy Nilsson Masth",
+      "authorUrl": null,
+      "source": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/men-on-a-construction-site-ewvx5TahIFA",
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    }
+  },
+  "project/riyadh-water-pipeline-trenching": {
+    "src": "/images/project/riyadh-water-pipeline-trenching.a302ebebe8.jpg",
+    "width": 1600,
+    "height": 1000,
+    "blurDataURL": "data:image/jpeg;base64,/9j/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAKABADASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAwUG/8QAIRAAAgAFBAMAAAAAAAAAAAAAAQIAAwUREgQTITIxQXH/xAAVAQEBAAAAAAAAAAAAAAAAAAADBP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/ALIriIBkQE9sfIhp9d02nxzfuAVJjGVBjtNyekPUQGpSX5sku1/hiYr/2Q==",
+    "alt": {
+      "en": "Excavator working beside an open trench with two pipelines laid along it, in dusty light",
+      "ar": "حفار يعمل بجوار خندق مفتوح مُدّ على امتداده خطا أنابيب، في أجواء غبار"
+    },
+    "credit": {
+      "author": "roman pentin",
+      "authorUrl": null,
+      "source": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/excavator-beside-large-pipes-T5QT2bmiD4E",
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    }
+  },
+  "project/khobar-plant-relocation": {
+    "src": "/images/project/khobar-plant-relocation.dbe0b8dcd3.jpg",
+    "width": 1600,
+    "height": 1000,
+    "blurDataURL": "data:image/jpeg;base64,/9j/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAKABADASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAwAE/8QAHRABAAICAgMAAAAAAAAAAAAAAQIDACERQRIxMv/EABUBAQEAAAAAAAAAAAAAAAAAAAAB/8QAGBEAAwEBAAAAAAAAAAAAAAAAAAECQRL/2gAMAwEAAhEDEQA/AFLBkx4PI9nZkXRl8o7405mvqrZq1xVdqYddcI2x4hE30ZHVLRzLw//Z",
+    "alt": {
+      "en": "Prime mover hauling a large earthmoving scraper on a multi-axle low-bed trailer along a highway",
+      "ar": "شاحنة جر تنقل كاشطة ترابية كبيرة على مقطورة منخفضة متعددة المحاور على طريق سريع"
+    },
+    "credit": {
+      "author": "Preston A Larimer",
+      "authorUrl": null,
+      "source": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/a-semi-truck-hauling-a-tractor-trailer-down-a-road-5ffMql3mX_o",
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    }
+  },
+  "project/jeddah-coastal-site-preparation": {
+    "src": "/images/project/jeddah-coastal-site-preparation.63d317e2eb.jpg",
+    "width": 1600,
+    "height": 1000,
+    "blurDataURL": "data:image/jpeg;base64,/9j/2wBDABIMDRANCxIQDhAUExIVGywdGxgYGzYnKSAsQDlEQz85Pj1HUGZXR0thTT0+WXlaYWltcnNyRVV9hnxvhWZwcm7/2wBDARMUFBsXGzQdHTRuST5Jbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm7/wAARCAAKABADASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAQQF/8QAHhAAAgICAgMAAAAAAAAAAAAAAQIDEQAhBBQxUWH/xAAVAQEBAAAAAAAAAAAAAAAAAAACA//EABgRAAMBAQAAAAAAAAAAAAAAAAACURIT/9oADAMBAAIRAxEAPwDReONVuHjSyUa0Rv7gsQkhDdWVHJ2rrQG/eMRIZaJGWkmvOT6NR4WH/9k=",
+    "alt": {
+      "en": "Wheel loader and two dump trucks on a sunny coastal site beside a white building and palm trees",
+      "ar": "لودر وشاحنتا قلاب في موقع ساحلي مشمس بجوار مبنى أبيض وأشجار نخيل"
+    },
+    "credit": {
+      "author": "Sorin Basangeac",
+      "authorUrl": null,
+      "source": "Unsplash",
+      "sourceUrl": "https://unsplash.com/photos/yellow-loader-and-trucks-at-a-construction-site-F86NXvreefg",
+      "license": "Unsplash License",
+      "licenseUrl": "https://unsplash.com/license"
+    }
   }
 } as const satisfies Record<string, SiteImage>;
 

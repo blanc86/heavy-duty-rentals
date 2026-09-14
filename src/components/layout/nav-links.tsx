@@ -32,7 +32,7 @@ export function NavLinks({ items, className, linkClassName }: { items: NavItem[]
               aria-current={current ? "page" : undefined}
               className={cn(
                 linkClassName,
-                current && "text-steel-950 after:absolute after:inset-x-3 after:-bottom-px after:h-[3px] after:bg-machine-500",
+                current && "text-steel-950 after:absolute after:inset-x-3 after:-bottom-px after:h-[3px] after:bg-brand-500",
               )}
             >
               {item.label}

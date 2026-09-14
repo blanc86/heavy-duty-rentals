@@ -49,6 +49,8 @@ async function main() {
   console.log(`sitemap: ${pages.length} URLs`);
 
   const internalLinks = new Set();
+  const anchorLinks = new Set();
+  const idsByPath = new Map();
   const images = new Set();
   const contactLinks = new Set();
 
@@ -62,6 +64,7 @@ async function main() {
     }
     const html = await res.text();
     const locale = path.split("/")[1];
+    idsByPath.set(decodeURIComponent(path), new Set(attr(html, /\sid="([^"]+)"/g)));
 
     const h1s = html.match(/<h1[\s>]/g) ?? [];
     if (h1s.length !== 1) fail(path, `${h1s.length} <h1> elements`);
@@ -93,13 +96,16 @@ async function main() {
     }
 
     for (const href of attr(html, /href="([^"]+)"/g).map(decode)) {
-      if (href.startsWith("/") && !href.startsWith("/_next")) internalLinks.add(href.split("#")[0]);
+      if (href.startsWith("/") && !href.startsWith("/_next")) {
+        internalLinks.add(href.split("#")[0]);
+        if (href.includes("#")) anchorLinks.add(href);
+      }
       else if (/^(tel:|mailto:|https:\/\/wa\.me)/.test(href)) contactLinks.add(href);
     }
     for (const src of attr(html, /(?:src|srcSet)="([^"]+)"/g).map(decode)) {
       for (const candidate of src.split(",")) {
         const u = candidate.trim().split(" ")[0];
-        if (u.startsWith("/_next/image") || u.startsWith("/images/") || u.startsWith("/og/")) images.add(u);
+        if (u.startsWith("/_next/image") || u.startsWith("/images/") || u.startsWith("/og/") || u.startsWith("/brand/")) images.add(u);
       }
     }
   }
@@ -114,6 +120,15 @@ async function main() {
     } else if (res.status !== 200) {
       fail(link, `internal link returns ${res.status}`);
     }
+  }
+
+  // A link to /projects#some-project must land on that project, not the top of
+  // the page: the id has to exist on the page it points at.
+  console.log(`anchor links: ${anchorLinks.size}`);
+  for (const link of anchorLinks) {
+    const [target, id] = link.split("#");
+    const ids = idsByPath.get(decodeURIComponent(target));
+    if (ids && !ids.has(decodeURIComponent(id))) fail(link, `no element with id "${id}" on ${target}`);
   }
 
   // Sample every image URL the pages ask for: the optimizer can fail per size.

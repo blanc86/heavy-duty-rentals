@@ -96,7 +96,7 @@ export function ContactBand({
           <ul className="mt-6 grid gap-3 sm:grid-cols-2">
             {dict.home.readyChecklist.map((item) => (
               <li key={item} className="flex items-start gap-2.5">
-                <CheckIcon className="mt-1 h-[1.1rem] w-[1.1rem] text-machine-500" />
+                <CheckIcon className="mt-1 h-[1.1rem] w-[1.1rem] text-brand-500" />
                 <span className="text-steel-200">{item}</span>
               </li>
             ))}

@@ -33,6 +33,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...MACHINES.flatMap((machine) => shared(machinePath(machine), 0.8, "monthly")),
     ...shared("/service-areas", 0.6, "monthly"),
     ...SERVICE_AREAS.flatMap((area) => shared(`/service-areas/${area.slug}`, 0.7, "monthly")),
+    ...shared("/projects", 0.7, "monthly"),
     ...shared("/about", 0.6, "monthly"),
     ...shared("/faq", 0.6, "monthly"),
     ...shared("/guides", 0.5, "monthly"),

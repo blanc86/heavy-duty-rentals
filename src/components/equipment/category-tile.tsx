@@ -34,7 +34,7 @@ export function CategoryTile({ category, locale }: { category: Category; locale:
         className="transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover:scale-100"
       />
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-steel-950/95 via-steel-950/70 to-transparent px-4 pt-14 pb-4">
-        <h3 className="text-[1.4rem] leading-tight text-white group-hover:underline decoration-machine-500 decoration-2 underline-offset-4">
+        <h3 className="text-[1.4rem] leading-tight text-white group-hover:underline decoration-brand-500 decoration-2 underline-offset-4">
           {category.name[locale]}
         </h3>
       </div>

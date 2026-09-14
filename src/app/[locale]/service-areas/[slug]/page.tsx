@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { CategoryTile } from "@/components/equipment/category-tile";
 import { ContactBand, FaqList, PageHeader } from "@/components/marketing/sections";
 import { JsonLd } from "@/components/seo/json-ld";
+import { ProjectCard } from "@/components/trust/project-card";
 import { ActionLink, Container, SectionHeading, WhatsAppIcon } from "@/components/ui";
 import { SERVICE_AREAS } from "@/content/business";
 import { FAQS } from "@/content/faqs";
 import { activeCategories } from "@/lib/catalog";
+import { projectsIn } from "@/lib/projects";
 import { whatsappHref } from "@/lib/contact";
 import { getDictionary, t } from "@/lib/i18n";
 import { LOCALES, isLocale, type Locale } from "@/lib/i18n/config";
@@ -55,6 +57,7 @@ export default async function ServiceAreaPage({ params }: { params: Params }) {
     { name: city, path: `/service-areas/${area.slug}` },
   ];
   const others = SERVICE_AREAS.filter((a) => a.slug !== area.slug);
+  const projects = projectsIn(area.slug);
 
   return (
     <>
@@ -75,7 +78,7 @@ export default async function ServiceAreaPage({ params }: { params: Params }) {
 
       <section aria-labelledby="planning" className="py-14 sm:py-16">
         <Container>
-          <div className="max-w-3xl border-s-4 border-machine-500 ps-6">
+          <div className="max-w-3xl border-s-4 border-brand-500 ps-6">
             <h2 id="planning" className="text-h2">
               {t(dict.areas.planningTitle, { city })}
             </h2>
@@ -83,6 +86,21 @@ export default async function ServiceAreaPage({ params }: { params: Params }) {
           </div>
         </Container>
       </section>
+
+      {projects.length > 0 && (
+        <section aria-labelledby="city-projects" className="border-t border-steel-200 py-14 sm:py-16">
+          <Container>
+            <SectionHeading id="city-projects" title={t(dict.projects.inCity, { city })} />
+            <ul className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project) => (
+                <li key={project.slug} className="flex">
+                  <ProjectCard project={project} locale={locale} dict={dict} className="w-full" />
+                </li>
+              ))}
+            </ul>
+          </Container>
+        </section>
+      )}
 
       <section aria-labelledby="city-equipment" className="border-t border-steel-200 bg-steel-50 py-14 sm:py-16">
         <Container>

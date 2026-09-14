@@ -109,7 +109,7 @@ export function EnquiryForm({
   }
 
   const fieldClass =
-    "mt-1.5 block min-h-12 w-full rounded-control border border-steel-300 bg-white px-3.5 py-2.5 text-[1rem] text-steel-900 placeholder:text-steel-500 focus:border-steel-900 focus:outline-none focus-visible:outline-3 focus-visible:outline-machine-500";
+    "mt-1.5 block min-h-12 w-full rounded-control border border-steel-300 bg-white px-3.5 py-2.5 text-[1rem] text-steel-900 placeholder:text-steel-500 focus:border-steel-900 focus:outline-none focus-visible:outline-3 focus-visible:outline-brand-600";
   const labelClass = "block font-semibold text-steel-900";
   const hasErrors = Boolean(errors.name || errors.phone);
 

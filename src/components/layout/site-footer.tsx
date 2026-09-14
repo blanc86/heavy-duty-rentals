@@ -21,16 +21,17 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dictionary 
   const linkClass = "text-steel-300 hover:text-white hover:underline underline-offset-4";
 
   return (
-    <footer className="border-t-4 border-machine-500 bg-steel-950 text-steel-300">
+    <footer className="border-t-4 border-brand-500 bg-steel-950 text-steel-300">
       <Container className="py-14">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
-            <Logo locale={locale} onDark />
+            <Logo locale={locale} onDark compactOnPhone={false} className="h-11" />
+            {BUSINESS.legalName && <p className="mt-3 text-sm font-semibold text-steel-200">{BUSINESS.legalName[locale]}</p>}
             <p className="mt-4 max-w-xs">{dict.footer.about}</p>
             <ul className="mt-6 space-y-3">
               <li>
                 <a href={telHref()} className="inline-flex items-center gap-2.5 text-white hover:underline underline-offset-4">
-                  <PhoneIcon className="h-4 w-4 text-machine-500" />
+                  <PhoneIcon className="h-4 w-4 text-brand-500" />
                   <span className="ltr-nums">{BUSINESS.phone.display}</span>
                 </a>
               </li>
@@ -41,7 +42,7 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dictionary 
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2.5 text-white hover:underline underline-offset-4"
                 >
-                  <WhatsAppIcon className="h-4 w-4 text-machine-500" />
+                  <WhatsAppIcon className="h-4 w-4 text-brand-500" />
                   {dict.cta.chatOnWhatsapp}
                 </a>
               </li>
@@ -50,7 +51,7 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dictionary 
                   href={mailtoHref({ subject: dict.messages.emailSubject })}
                   className="inline-flex items-center gap-2.5 text-white hover:underline underline-offset-4"
                 >
-                  <MailIcon className="h-4 w-4 text-machine-500" />
+                  <MailIcon className="h-4 w-4 text-brand-500" />
                   <span className="ltr-nums">{BUSINESS.email}</span>
                 </a>
               </li>
@@ -87,7 +88,9 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dictionary 
             <h2 className="font-display text-lg font-bold text-white">{dict.footer.company}</h2>
             <ul className="mt-4 space-y-2.5">
               {[
+                { path: "/projects", label: dict.nav.projects },
                 { path: "/about", label: dict.nav.about },
+                { path: "/about#certifications", label: dict.nav.certifications },
                 { path: "/contact", label: dict.nav.contact },
                 { path: "/guides", label: dict.nav.guides },
                 { path: "/faq", label: dict.nav.faq },
@@ -105,7 +108,7 @@ export function SiteFooter({ locale, dict }: { locale: Locale; dict: Dictionary 
 
         <div className="mt-12 flex flex-col gap-4 border-t border-white/10 pt-6 text-sm text-steel-400 md:flex-row md:items-center md:justify-between">
           <p>
-            © <span className="ltr-nums">{year}</span> {BUSINESS.legalName ?? BUSINESS.name[locale]}. {dict.footer.rights}
+            © <span className="ltr-nums">{year}</span> {(BUSINESS.legalName?.[locale] ?? BUSINESS.name[locale]).replace(/\.$/, "")}. {dict.footer.rights}
             {BUSINESS.crNumber && (
               <>
                 {" "}

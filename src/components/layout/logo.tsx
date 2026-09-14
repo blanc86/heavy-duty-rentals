@@ -5,38 +5,56 @@ import { href } from "@/lib/site";
 import { cn } from "@/components/ui";
 
 /**
- * Wordmark.
+ * The TechSteps logo.
  *
- * A PLACEHOLDER for the company's real logo, built to stand in without looking
- * like one: a yellow block with a single boom line — the angle of a crane jib
- * under load — beside the name in the display face. Swap the <svg> and text for
- * the real mark when it exists; the size and link behaviour can stay.
+ * The company's logo is bilingual — TECHSTEPS, the gear-and-crane mark, then
+ * تكستيب — and far too wide for a header at that size. So each language shows
+ * the half of it that reads in that language: the English wordmark with the
+ * mark on English pages, the mark with the Arabic wordmark on Arabic ones. Both
+ * are cut from the original artwork in public/brand, not redrawn.
+ *
+ * On a phone narrower than 380 px the mark stands alone, so the call and menu
+ * buttons keep their room. A <picture> switches between them, which means the
+ * browser downloads only the one it shows. SVG needs no resizing, so this
+ * bypasses next/image deliberately.
  */
-export function Logo({ locale, onDark = false, className }: { locale: Locale; onDark?: boolean; className?: string }) {
+const WORDMARK = {
+  en: { light: "/brand/logo-en.svg", dark: "/brand/logo-en-on-dark.svg", width: 1076, height: 225 },
+  ar: { light: "/brand/logo-ar.svg", dark: "/brand/logo-ar-on-dark.svg", width: 955, height: 234 },
+} as const;
+
+const MARK = { light: "/brand/mark.svg", dark: "/brand/mark-on-dark.svg", width: 312, height: 225 } as const;
+
+export function Logo({
+  locale,
+  onDark = false,
+  compactOnPhone = true,
+  className,
+}: {
+  locale: Locale;
+  onDark?: boolean;
+  /** Show only the mark below 380 px. Off where there is room, as in the footer. */
+  compactOnPhone?: boolean;
+  className?: string;
+}) {
+  const wordmark = WORDMARK[locale];
+  const tone = onDark ? "dark" : "light";
+
   return (
-    <Link
-      href={href(locale)}
-      className={cn("flex items-center gap-2.5 rounded-sm", className)}
-      aria-label={BUSINESS.name[locale]}
-    >
-      <svg viewBox="0 0 40 40" className="h-9 w-9 shrink-0" aria-hidden="true">
-        <rect width="40" height="40" rx="3" fill="#f4b000" />
-        <path d="M8 31 L31 10" stroke="#121920" strokeWidth="4" strokeLinecap="square" />
-        <path d="M31 10 V21" stroke="#121920" strokeWidth="2.5" />
-        <rect x="27.5" y="21" width="7" height="5" fill="#121920" />
-        <rect x="6" y="30" width="12" height="4" fill="#121920" />
-      </svg>
-      {/* Below 380 px the name gives way to the mark: the Arabic name is wide
-          enough to push the call and menu buttons off a small phone. The link
-          keeps the full name as its accessible label either way. */}
-      <span
-        className={cn(
-          "hidden font-display text-[1.15rem] leading-none font-bold tracking-tight whitespace-nowrap min-[380px]:inline min-[420px]:text-[1.35rem]",
-          onDark ? "text-white" : "text-steel-900",
+    <Link href={href(locale)} className={cn("inline-flex shrink-0 items-center rounded-sm", className)}>
+      <picture className="block h-full">
+        {compactOnPhone && (
+          <source media="(min-width: 380px)" srcSet={wordmark[tone]} width={wordmark.width} height={wordmark.height} />
         )}
-      >
-        {BUSINESS.name[locale]}
-      </span>
+        <img
+          src={compactOnPhone ? MARK[tone] : wordmark[tone]}
+          width={compactOnPhone ? MARK.width : wordmark.width}
+          height={compactOnPhone ? MARK.height : wordmark.height}
+          alt={BUSINESS.name[locale]}
+          decoding="async"
+          className="block h-full w-auto"
+        />
+      </picture>
     </Link>
   );
 }

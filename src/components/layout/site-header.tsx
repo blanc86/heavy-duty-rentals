@@ -13,24 +13,29 @@ import { NavLinks } from "./nav-links";
 /**
  * Site header.
  *
- * Four links and a quote button — research across rental sites found the ones
+ * Five links and a quote button — research across rental sites found the ones
  * that convert keep navigation short and put the phone number where a site
  * manager's eye goes first. The phone number is a real tap target on desktop
  * too: plenty of procurement staff call from a desk with a softphone.
+ *
+ * The background is solid, not a translucent blur. backdrop-filter makes the
+ * header the containing block for fixed-position descendants, which shrank the
+ * full-screen mobile menu to the height of the header bar.
  */
 export function SiteHeader({ locale, dict }: { locale: Locale; dict: Dictionary }) {
   const items = [
     { href: href(locale), label: dict.nav.home },
     { href: href(locale, "/equipment"), label: dict.nav.equipment },
+    { href: href(locale, "/projects"), label: dict.nav.projects },
     { href: href(locale, "/about"), label: dict.nav.about },
     { href: href(locale, "/contact"), label: dict.nav.contact },
   ];
   const guideSlugs = GUIDES.map((guide) => guide.slug);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-steel-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+    <header className="sticky top-0 z-40 border-b border-steel-200 bg-white">
       <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-4 px-5 sm:px-8 lg:h-[4.5rem]">
-        <Logo locale={locale} />
+        <Logo locale={locale} className="h-8 min-[380px]:h-7 sm:h-9 lg:h-10" />
 
         <nav aria-label={dict.nav.primary} className="ms-6 hidden lg:block">
           <NavLinks
@@ -79,6 +84,7 @@ export function SiteHeader({ locale, dict }: { locale: Locale; dict: Dictionary 
             openLabel={dict.nav.openMenu}
             closeLabel={dict.nav.closeMenu}
             menuLabel={dict.nav.primary}
+            brand={<Logo locale={locale} compactOnPhone={false} className="h-full" />}
           >
             <ButtonLink href={href(locale, "/contact")} className="w-full">
               {dict.cta.getQuote}

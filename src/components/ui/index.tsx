@@ -12,7 +12,7 @@ export function Container({ className, ...props }: ComponentProps<"div">) {
 /**
  * Button styles.
  *
- * Four, each with one job. `primary` is machine yellow and appears once per
+ * Four, each with one job. `primary` is TechSteps orange and appears once per
  * view; `whatsapp` is only ever a WhatsApp action; `outline` and `onDark` are
  * the quiet alternatives. Every size keeps a 48 px minimum height — these are
  * tapped by people standing on a site, often in gloves.
@@ -21,7 +21,7 @@ const BUTTON_BASE =
   "inline-flex min-h-12 items-center justify-center gap-2.5 rounded-control px-5 text-[1rem] font-semibold leading-tight transition-colors duration-150 focus-visible:outline-offset-4";
 
 export const BUTTON_VARIANTS = {
-  primary: "bg-machine-500 text-steel-950 hover:bg-machine-400",
+  primary: "bg-brand-500 text-steel-950 hover:bg-brand-400",
   whatsapp: "bg-whatsapp-600 text-white hover:bg-whatsapp-700",
   outline: "border border-steel-300 bg-white text-steel-900 hover:border-steel-900",
   onDark: "border border-white/35 text-white hover:border-white hover:bg-white/10",
@@ -206,6 +206,16 @@ export function ClockIcon(props: IconProps) {
     <Svg {...props}>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
+    </Svg>
+  );
+}
+
+/** A magnifier with a plus: "open this larger". */
+export function ExpandIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-4.8-4.8M10.5 8v5M8 10.5h5" />
     </Svg>
   );
 }

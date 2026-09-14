@@ -21,12 +21,15 @@ export function MobileMenu({
   openLabel,
   closeLabel,
   menuLabel,
+  brand,
   children,
 }: {
   items: NavItem[];
   openLabel: string;
   closeLabel: string;
   menuLabel: string;
+  /** The logo, so the open panel still says whose site this is. */
+  brand?: ReactNode;
   /** Contact actions rendered beneath the links. */
   children: ReactNode;
 }) {
@@ -95,7 +98,12 @@ export function MobileMenu({
         hidden={!open}
         className="fixed inset-0 z-50 flex flex-col bg-white lg:hidden"
       >
-        <div className="flex h-16 items-center justify-end border-b border-steel-200 px-5">
+        <div className="flex h-16 items-center justify-between gap-4 border-b border-steel-200 px-5">
+          {/* Closing on click: the logo links home, and a client-side navigation
+              would otherwise leave the panel open over the new page. */}
+          <div className="h-8" onClick={() => setOpen(false)}>
+            {brand}
+          </div>
           <button
             type="button"
             onClick={close}

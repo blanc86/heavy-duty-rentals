@@ -99,7 +99,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
           </a>
 
           <a href={telHref()} className={methodClass}>
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-steel-900 text-machine-500">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-steel-900 text-brand-500">
               <PhoneIcon className="h-6 w-6" />
             </span>
             <span>
@@ -112,7 +112,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
           </a>
 
           <a href={mailtoHref({ subject: dict.messages.emailSubject })} className={methodClass}>
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-steel-900 text-machine-500">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-steel-900 text-brand-500">
               <MailIcon className="h-6 w-6" />
             </span>
             <span className="min-w-0">

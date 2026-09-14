@@ -5,7 +5,8 @@
  * Copy rules this file follows, so later edits keep to them:
  *  - Say what a button does ("Get a quote", "WhatsApp us"), never "Submit".
  *  - No response times, prices, stock levels, years or client names. Those are
- *    the business's to state; see content/business.ts.
+ *    the business's to state; see content/business.ts. Project and
+ *    certificate details live in content/, where samples are flagged.
  *  - Sentence case everywhere.
  */
 export const en = {
@@ -45,6 +46,9 @@ export const en = {
     privacyDescription: "How this website handles information: no accounts, no tracking cookies, and a quote form that sends nothing until you press send in WhatsApp or email.",
     termsTitle: "Website Terms of Use",
     termsDescription: "Terms for using this website: equipment information and specifications, how quotes and rentals are agreed, and safety responsibilities.",
+    projectsTitle: "Completed Projects",
+    projectsDescription:
+      "Equipment rental work across Saudi Arabia: crane lifts at industrial plants, earthworks, heavy transport and access platforms, with the machines used on each job.",
     creditsTitle: "Image Credits",
     creditsDescription: "Photographers and licences for the images used on this website.",
   },
@@ -52,6 +56,8 @@ export const en = {
   nav: {
     home: "Home",
     equipment: "Equipment",
+    projects: "Projects",
+    certifications: "Certifications",
     about: "About",
     contact: "Contact",
     guides: "Guides",
@@ -309,6 +315,38 @@ export const en = {
     equipmentTitle: "Equipment in this guide",
   },
 
+  projects: {
+    title: "Completed projects",
+    intro:
+      "What each job needed, the machines we supplied and the figures that mattered — from plant shutdown lifts to earthworks and heavy transport.",
+    homeTitle: "Recent projects",
+    homeIntro: "The kind of work our cranes, earthmoving machines and transport support across the Kingdom.",
+    viewAll: "View all projects",
+    client: "Client",
+    location: "Location",
+    completed: "Completed",
+    duration: "Duration",
+    scope: "What we supplied",
+    equipment: "Equipment used",
+    facts: "Key figures",
+    inCity: "Projects in {city}",
+    ctaTitle: "Planning a similar job?",
+    ctaBody: "Tell us the scope and your dates, and we'll put together the equipment and a quote.",
+  },
+
+  certifications: {
+    title: "Certifications and inspections",
+    intro: "The certificates behind our equipment, our operators and the way we work. Ask for copies with your quote.",
+    view: "View certificate",
+    viewSuffix: ": {name}",
+    close: "Close",
+    issuer: "Issued by",
+    number: "Certificate no.",
+    validUntil: "Valid until",
+    pdf: "Open the PDF",
+    specimen: "A specimen is shown here. It will be replaced by the issued certificate.",
+  },
+
   faq: {
     title: "Frequently asked questions",
     intro: "Straight answers about renting equipment from us. Can't find yours? Ask us on WhatsApp.",
@@ -336,6 +374,7 @@ export const en = {
 
   common: {
     home: "Home",
+    sample: "Sample",
   },
 
   notFound: {

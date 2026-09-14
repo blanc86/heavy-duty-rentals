@@ -18,6 +18,8 @@
  *   - the mobile menu opens, traps focus, and closes on Escape
  *   - the quote form refuses an empty submit and focuses its error summary
  *   - a machine page's quote link preselects that machine in the form
+ *   - a certificate opens in a modal dialog that closes on Escape and returns
+ *     focus to the certificate
  *
  * axe is injected with page.evaluate rather than addScriptTag: the site's CSP
  * blocks injected <script> tags, which is the policy working as intended.
@@ -37,6 +39,7 @@ const TEMPLATES = [
   "/equipment",
   "/equipment/mobile-cranes",
   "/equipment/mobile-cranes/all-terrain-crane-100t",
+  "/projects",
   "/contact",
   "/about",
   "/service-areas",
@@ -130,6 +133,10 @@ async function main() {
     await toggle.click();
     const dialog = page.getByRole("dialog");
     if (!(await dialog.isVisible())) fail("mobile menu", "does not open");
+    // "Visible" is not enough: an ancestor with a filter or transform confines
+    // a fixed panel to its own box, leaving a menu one header-bar tall.
+    const panel = await page.evaluate(() => [document.querySelector("[role=dialog]")?.getBoundingClientRect().height ?? 0, window.innerHeight]);
+    if (panel[0] < panel[1] - 1) fail("mobile menu", `panel is ${Math.round(panel[0])}px tall on a ${panel[1]}px screen`);
     for (let i = 0; i < 12; i += 1) await page.keyboard.press("Tab");
     const inside = await page.evaluate(() => Boolean(document.activeElement?.closest("[role=dialog]")));
     if (!inside) fail("mobile menu", "focus escaped the open menu");
@@ -137,6 +144,32 @@ async function main() {
     if (await dialog.isVisible()) fail("mobile menu", "does not close on Escape");
     const back = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
     if (back !== "Open menu") fail("mobile menu", `focus did not return to the menu button (${back})`);
+    await page.close();
+  }
+
+  // Certificate viewer: opens as a modal, is audited open, closes on Escape.
+  {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.goto(`${BASE}/en/about`);
+    const trigger = page.locator("#certifications button[aria-haspopup=dialog]").first();
+    await trigger.click();
+    const dialog = page.locator("dialog[open]");
+    if (!(await dialog.isVisible())) fail("certificate viewer", "does not open");
+    const inside = await page.evaluate(() => Boolean(document.activeElement?.closest("dialog[open]")));
+    if (!inside) fail("certificate viewer", "focus is not inside the open dialog");
+    await page.evaluate((src) => {
+      (0, eval)(src);
+    }, axeSource);
+    const violations = await page.evaluate(async (tags) => {
+      // @ts-expect-error injected
+      const r = await window.axe.run(document.querySelector("dialog[open]"), { runOnly: { type: "tag", values: tags } });
+      return r.violations.map((v) => `${v.id} x${v.nodes.length}`);
+    }, TAGS);
+    for (const v of violations) fail("certificate viewer", `axe: ${v}`);
+    await page.keyboard.press("Escape");
+    if ((await page.locator("dialog[open]").count()) > 0) fail("certificate viewer", "does not close on Escape");
+    const back = await page.evaluate(() => document.activeElement?.getAttribute("aria-haspopup"));
+    if (back !== "dialog") fail("certificate viewer", "focus did not return to the certificate");
     await page.close();
   }
 
